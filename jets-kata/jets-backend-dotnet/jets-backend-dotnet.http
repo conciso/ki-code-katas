@@ -1,0 +1,6 @@
+@jets_backend_dotnet_HostAddress = http://localhost:5075
+
+GET {{jets_backend_dotnet_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
