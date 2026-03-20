@@ -115,10 +115,15 @@ Es gibt keine formale Bewertung — aber am Showcase achten wir auf:
 
 ## Technische Voraussetzungen
 
-Auf jedem Rechner muss installiert sein:
-- Node.js 24+
-- Java 21+ mit Maven
-- .NET 10 SDK
+Je nach gewähltem Projekt muss auf dem Rechner nur der entsprechende Stack installiert sein:
+
+| Projekt | Voraussetzungen |
+|---------|----------------|
+| Frontend (Angular / Vue) | Node.js 24+ |
+| Backend (Spring Boot) | Java 21+ mit Maven |
+| Backend (ASP.NET) | .NET 10 SDK |
+
+Zusätzlich für alle Teams:
 - Ein Browser mit DevTools
 - Eine IDE nach Wahl
 
