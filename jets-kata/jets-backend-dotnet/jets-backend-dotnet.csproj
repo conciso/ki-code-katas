@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>jets_backend_dotnet</RootNamespace>
+    <DefaultItemExcludes>$(DefaultItemExcludes);jets-backend-dotnet.Tests\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>
