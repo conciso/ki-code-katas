@@ -1,3 +1,5 @@
 package com.jets.backend.websocketapi;
 
-record ErrorData(String code, String message) {}
+import com.jets.backend.core.service.ErrorCode;
+
+record ErrorData(ErrorCode code, String message) {}

@@ -2,14 +2,14 @@ package com.jets.backend.core.service;
 
 public class LobbyException extends RuntimeException {
 
-    private final String errorCode;
+    private final ErrorCode errorCode;
 
-    public LobbyException(String errorCode, String message) {
+    public LobbyException(ErrorCode errorCode, String message) {
         super(message);
         this.errorCode = errorCode;
     }
 
-    public String getErrorCode() {
+    public ErrorCode getErrorCode() {
         return errorCode;
     }
 }

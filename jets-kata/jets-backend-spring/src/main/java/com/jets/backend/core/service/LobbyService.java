@@ -39,13 +39,13 @@ public class LobbyService {
     public void joinLobby(String lobbyCode, PlayerInfo player) {
         Lobby lobby = lobbies.get(lobbyCode);
         if (lobby == null) {
-            throw new LobbyException("LOBBY_NOT_FOUND", "Lobby " + lobbyCode + " existiert nicht");
+            throw new LobbyException(ErrorCode.LOBBY_NOT_FOUND, "Lobby " + lobbyCode + " existiert nicht");
         }
         if (lobby.started()) {
-            throw new LobbyException("GAME_IN_PROGRESS", "Das Spiel läuft bereits");
+            throw new LobbyException(ErrorCode.GAME_IN_PROGRESS, "Das Spiel läuft bereits");
         }
         if (lobby.players().size() >= PLAYER_COLORS.size()) {
-            throw new LobbyException("LOBBY_FULL", "Die Lobby ist voll (max. " + PLAYER_COLORS.size() + " Spieler)");
+            throw new LobbyException(ErrorCode.LOBBY_FULL, "Die Lobby ist voll (max. " + PLAYER_COLORS.size() + " Spieler)");
         }
         String color = PLAYER_COLORS.get(lobby.players().size());
 
@@ -71,17 +71,17 @@ public class LobbyService {
     public void startGame(String lobbyCode, String hostId) {
         Lobby lobby = lobbies.get(lobbyCode);
         if (lobby == null) {
-            throw new LobbyException("LOBBY_NOT_FOUND", "Lobby existiert nicht");
+            throw new LobbyException(ErrorCode.LOBBY_NOT_FOUND, "Lobby existiert nicht");
         }
         if (lobby.players().size() < 2) {
-            throw new LobbyException("NOT_ENOUGH_PLAYERS", "Mindestens 2 Spieler werden benötigt");
+            throw new LobbyException(ErrorCode.NOT_ENOUGH_PLAYERS, "Mindestens 2 Spieler werden benötigt");
         }
         if (!hostId.equals(lobby.hostId())) {
-            throw new LobbyException("NOT_HOST", "Nur der Host darf das Spiel starten");
+            throw new LobbyException(ErrorCode.NOT_HOST, "Nur der Host darf das Spiel starten");
         }
         boolean allReady = lobby.players().stream().allMatch(p -> p.ready());
         if (!allReady) {
-            throw new LobbyException("NOT_ALL_READY", "Nicht alle Spieler sind bereit");
+            throw new LobbyException(ErrorCode.NOT_ALL_READY, "Nicht alle Spieler sind bereit");
         }
         lobby.start();
     }
