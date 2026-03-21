@@ -21,6 +21,19 @@ public class GameManager
         _logger = logger;
     }
 
+    public IEnumerable<object> GetLobbies()
+    {
+        return _lobbies.Values.Select(lobby => new
+        {
+            code = lobby.Code,
+            hostId = lobby.HostId,
+            gameMode = lobby.GameMode,
+            playerCount = lobby.Players.Count,
+            status = _lobbySessions.ContainsKey(lobby.Code) ? "in_game" : "waiting",
+            players = lobby.Players.Select(p => new { id = p.Id, name = p.Name, ready = p.Ready })
+        });
+    }
+
     public async Task HandleConnectionAsync(WebSocket socket, string playerName)
     {
         var playerId = GeneratePlayerId();
