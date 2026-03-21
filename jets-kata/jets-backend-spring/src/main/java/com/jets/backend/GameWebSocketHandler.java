@@ -1,5 +1,7 @@
 package com.jets.backend;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -10,6 +12,8 @@ import java.util.UUID;
 
 @Component
 public class GameWebSocketHandler extends TextWebSocketHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GameWebSocketHandler.class);
 
     private final LobbyService lobbyService;
     private final GameService gameService;
@@ -25,13 +29,23 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         String playerId = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
         session.getAttributes().put("playerId", playerId);
         session.getAttributes().put("playerName", extractPlayerName(session));
-        session.sendMessage(new TextMessage(
+        log.info("CONNECT  [{}] playerName={} playerId={}", session.getId(),
+                session.getAttributes().get("playerName"), playerId);
+        send(session, new TextMessage(
                 "{\"type\":\"CONNECTED\",\"data\":{\"playerId\":\"%s\",\"serverTickRate\":30}}".formatted(playerId)));
+    }
+
+    @Override
+    public void afterConnectionClosed(WebSocketSession session,
+            org.springframework.web.socket.CloseStatus status) {
+        log.info("DISCONNECT [{}] playerName={} status={}", session.getId(),
+                session.getAttributes().get("playerName"), status);
     }
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
         String payload = message.getPayload();
+        log.debug("RECV [{}] {}", session.getAttributes().get("playerName"), payload);
         switch (MessageType.from(payload)) {
             case CREATE_LOBBY  -> handleCreateLobby(session);
             case JOIN_LOBBY    -> handleJoinLobby(session, payload);
@@ -50,7 +64,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         String hostId = (String) session.getAttributes().get("playerId");
         String hostName = (String) session.getAttributes().get("playerName");
         lobbyService.createLobby(lobbyCode, hostId, hostName, session);
-        session.sendMessage(new TextMessage(
+        send(session, new TextMessage(
                 "{\"type\":\"LOBBY_CREATED\",\"data\":{\"lobbyCode\":\"%s\",\"hostId\":\"%s\"}}"
                         .formatted(lobbyCode, hostId)));
     }
@@ -105,7 +119,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         lobbyService.startGame(lobbyCode);
         List<WebSocketSession> sessions = lobbyService.getSessions(lobbyCode);
         for (WebSocketSession s : sessions) {
-            s.sendMessage(new TextMessage("{\"type\":\"GAME_STARTING\",\"data\":{}}"));
+            send(s, new TextMessage("{\"type\":\"GAME_STARTING\",\"data\":{}}"));
         }
         gameService.startGame(lobbyCode, lobbyService.getPlayers(lobbyCode), sessions);
     }
@@ -123,19 +137,24 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
     private void handlePing(WebSocketSession session, String payload) throws Exception {
         long timestamp = Long.parseLong(payload.replaceAll(".*\"timestamp\":(\\d+).*", "$1"));
-        session.sendMessage(new TextMessage(
+        send(session, new TextMessage(
                 "{\"type\":\"PONG\",\"data\":{\"timestamp\":%d}}".formatted(timestamp)));
     }
 
+    private void send(WebSocketSession session, TextMessage message) throws Exception {
+        log.debug("SEND [{}] {}", session.getAttributes().get("playerName"), message.getPayload());
+        session.sendMessage(message);
+    }
+
     private void sendError(WebSocketSession session, String code, String message) throws Exception {
-        session.sendMessage(new TextMessage(
+        send(session, new TextMessage(
                 "{\"type\":\"ERROR\",\"data\":{\"code\":\"%s\",\"message\":\"%s\"}}".formatted(code, message)));
     }
 
     private void broadcast(String lobbyCode) throws Exception {
         String lobbyState = lobbyService.buildLobbyState(lobbyCode);
         for (WebSocketSession s : lobbyService.getSessions(lobbyCode)) {
-            s.sendMessage(new TextMessage(lobbyState));
+            send(s, new TextMessage(lobbyState));
         }
     }
 
