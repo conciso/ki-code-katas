@@ -1,0 +1,95 @@
+<div class="lobby-container">
+  <h1 class="title">JETS</h1>
+  <p class="subtitle">MULTIPLAYER ARCADE SHOOTER</p>
+
+  <!-- Connect Screen -->
+  @if (!ws.isConnected()) {
+    <div class="panel">
+      <input
+        type="text"
+        placeholder="PLAYER NAME"
+        [ngModel]="playerName()"
+        (ngModelChange)="playerName.set($event)"
+        (keyup.enter)="connect()"
+        class="input"
+        maxlength="12"
+      />
+      <button (click)="connect()" class="btn btn-primary" [disabled]="!playerName()">
+        CONNECT
+      </button>
+    </div>
+  }
+
+  <!-- Connected, not in lobby -->
+  @if (ws.isConnected() && !inLobby()) {
+    <div class="panel">
+      <p class="connected-info">Connected as <span class="highlight">{{ playerName() }}</span></p>
+
+      <button (click)="createLobby()" class="btn btn-primary">CREATE LOBBY</button>
+
+      <div class="divider">OR</div>
+
+      <div class="join-row">
+        <input
+          type="text"
+          placeholder="LOBBY CODE"
+          [ngModel]="joinCode()"
+          (ngModelChange)="joinCode.set($event)"
+          (keyup.enter)="joinLobby()"
+          class="input input-code"
+          maxlength="6"
+        />
+        <button (click)="joinLobby()" class="btn btn-secondary" [disabled]="!joinCode()">
+          JOIN
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- In Lobby -->
+  @if (inLobby()) {
+    <div class="panel lobby-panel">
+      <div class="lobby-header">
+        <span class="label">LOBBY</span>
+        <span class="lobby-code">{{ lobbyCode() }}</span>
+      </div>
+
+      <div class="player-list">
+        @for (player of players(); track player.id) {
+          <div class="player-row">
+            <span class="player-color" [style.background]="player.color"></span>
+            <span class="player-name">{{ player.name }}</span>
+            @if (player.id === hostId()) {
+              <span class="badge host">HOST</span>
+            }
+            @if (player.ready) {
+              <span class="badge ready">READY</span>
+            }
+          </div>
+        }
+      </div>
+
+      <div class="lobby-actions">
+        <button (click)="toggleReady()" class="btn" [class.btn-ready]="!isReady()" [class.btn-unready]="isReady()">
+          {{ isReady() ? 'NOT READY' : 'READY' }}
+        </button>
+
+        @if (isHost()) {
+          <button
+            (click)="startGame()"
+            class="btn btn-start"
+            [disabled]="!allReady()"
+          >
+            START GAME
+          </button>
+        }
+
+        <button (click)="leaveLobby()" class="btn btn-leave">LEAVE</button>
+      </div>
+    </div>
+  }
+
+  @if (errorMessage()) {
+    <div class="error">{{ errorMessage() }}</div>
+  }
+</div>

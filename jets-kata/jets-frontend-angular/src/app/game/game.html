@@ -1,0 +1,36 @@
+<div class="game-container">
+  <canvas #gameCanvas class="game-canvas"></canvas>
+
+  <!-- HUD -->
+  <div class="hud">
+    <div class="hud-left">
+      <div class="hud-score">{{ score() }}</div>
+      <div class="hud-hp">
+        @for (i of [].constructor(hp()); track $index) {
+          <span class="heart">&#9829;</span>
+        }
+      </div>
+    </div>
+
+    <div class="hud-right">
+      <div class="scoreboard">
+        @for (p of scoreboard(); track p.id) {
+          <div class="scoreboard-row" [class.me]="p.id === ws.playerId()">
+            <span class="sb-color" [style.background]="p.color"></span>
+            <span class="sb-name">{{ p.name }}</span>
+            <span class="sb-score">{{ p.score }}</span>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+
+  @if (!alive()) {
+    <div class="respawn-overlay">
+      <div class="respawn-text">DESTROYED</div>
+      @if (respawnIn() > 0) {
+        <div class="respawn-timer">RESPAWN IN {{ respawnIn() }}</div>
+      }
+    </div>
+  }
+</div>
