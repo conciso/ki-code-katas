@@ -14,9 +14,29 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+app.UseWebSockets();
 app.UseAuthorization();
 
 app.MapControllers();
+
+app.Map("/ws", async context =>
+{
+    using var ws = await context.WebSockets.AcceptWebSocketAsync();
+    var buffer = new byte[1024];
+
+    while (true)
+    {
+        var result = await ws.ReceiveAsync(buffer, CancellationToken.None);
+        if (result.MessageType == System.Net.WebSockets.WebSocketMessageType.Close)
+            break;
+
+        await ws.SendAsync(
+            buffer.AsMemory(0, result.Count),
+            result.MessageType,
+            result.EndOfMessage,
+            CancellationToken.None);
+    }
+});
 
 app.Run();
 
