@@ -92,6 +92,10 @@ public class LobbyService {
         return hostPlayerIds.get(lobbyCode);
     }
 
+    public List<Player> getPlayers(String lobbyCode) {
+        return lobbyPlayers.getOrDefault(lobbyCode, List.of());
+    }
+
     public List<WebSocketSession> getSessions(String lobbyCode) {
         return lobbySessionIds.getOrDefault(lobbyCode, List.of()).stream()
                 .map(sessionRegistry::get)

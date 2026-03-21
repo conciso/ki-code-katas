@@ -574,4 +574,129 @@ class WebSocketConnectionTest {
         assertThat(leftMessage.get()).contains("\"type\":\"LOBBY_STATE\"");
         assertThat(leftMessage.get()).doesNotContain("\"name\":\"Bob\"");
     }
+
+    // -------------------------------------------------------------------------
+    // Iteration 2 — Spiellogik
+    // -------------------------------------------------------------------------
+
+    @Test
+    void shouldReceiveGameStateAfterGameStarts() throws Exception {
+        AtomicReference<String> gameStateMessage = new AtomicReference<>();
+        CountDownLatch gameStateLatch = new CountDownLatch(1);
+
+        WebSocketSession hostSession = startGame(new TextWebSocketHandler() {
+            @Override
+            protected void handleTextMessage(WebSocketSession session, TextMessage message) {
+                if (message.getPayload().contains("\"type\":\"GAME_STATE\"")) {
+                    gameStateMessage.set(message.getPayload());
+                    gameStateLatch.countDown();
+                }
+            }
+        });
+
+        assertThat(gameStateLatch.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(gameStateMessage.get()).contains("\"type\":\"GAME_STATE\"");
+        assertThat(gameStateMessage.get()).contains("\"tick\"");
+        assertThat(gameStateMessage.get()).contains("\"players\"");
+    }
+
+    @Test
+    void shouldUpdatePlayerPositionAfterInput() throws Exception {
+        AtomicReference<Double> initialX = new AtomicReference<>();
+        AtomicReference<Double> updatedX = new AtomicReference<>();
+        CountDownLatch firstStateLatch = new CountDownLatch(1);
+        CountDownLatch updatedStateLatch = new CountDownLatch(1);
+
+        WebSocketSession hostSession = startGame(new TextWebSocketHandler() {
+            @Override
+            protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
+                if (message.getPayload().contains("\"type\":\"GAME_STATE\"")) {
+                    if (initialX.get() == null) {
+                        String xStr = message.getPayload().replaceAll(".*?\"x\":([0-9.]+).*", "$1");
+                        initialX.set(Double.parseDouble(xStr));
+                        firstStateLatch.countDown();
+                        session.sendMessage(new TextMessage(
+                                "{\"type\":\"PLAYER_INPUT\",\"data\":{\"up\":false,\"down\":false,\"left\":false,\"right\":true,\"shoot\":false,\"seq\":1}}"));
+                    } else if (updatedX.get() == null) {
+                        String xStr = message.getPayload().replaceAll(".*?\"x\":([0-9.]+).*", "$1");
+                        updatedX.set(Double.parseDouble(xStr));
+                        updatedStateLatch.countDown();
+                    }
+                }
+            }
+        });
+
+        assertThat(firstStateLatch.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(updatedStateLatch.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(updatedX.get()).isGreaterThan(initialX.get());
+    }
+
+    @Test
+    void shouldAddProjectileWhenPlayerShoots() throws Exception {
+        AtomicReference<String> gameStateWithProjectile = new AtomicReference<>();
+        CountDownLatch projectileLatch = new CountDownLatch(1);
+
+        WebSocketSession hostSession = startGame(new TextWebSocketHandler() {
+            @Override
+            protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
+                if (message.getPayload().contains("\"type\":\"GAME_STATE\"")) {
+                    if (gameStateWithProjectile.get() == null) {
+                        session.sendMessage(new TextMessage(
+                                "{\"type\":\"PLAYER_INPUT\",\"data\":{\"up\":false,\"down\":false,\"left\":false,\"right\":false,\"shoot\":true,\"seq\":1}}"));
+                    }
+                    if (message.getPayload().contains("\"projectiles\":[{")) {
+                        gameStateWithProjectile.set(message.getPayload());
+                        projectileLatch.countDown();
+                    }
+                }
+            }
+        });
+
+        assertThat(projectileLatch.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(gameStateWithProjectile.get()).contains("\"projectiles\"");
+        assertThat(gameStateWithProjectile.get()).contains("\"owner\"");
+    }
+
+    // Hilfsmethode: Lobby erstellen, joinen und Spiel starten
+    private WebSocketSession startGame(TextWebSocketHandler hostHandler) throws Exception {
+        AtomicReference<String> lobbyCode = new AtomicReference<>();
+        CountDownLatch lobbyCreatedLatch = new CountDownLatch(1);
+        CountDownLatch joinedLatch = new CountDownLatch(1);
+        CountDownLatch gameStartingLatch = new CountDownLatch(1);
+
+        StandardWebSocketClient client = new StandardWebSocketClient();
+        WebSocketSession hostSession = client.execute(new TextWebSocketHandler() {
+            @Override
+            protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
+                if (message.getPayload().contains("\"type\":\"LOBBY_CREATED\"")) {
+                    lobbyCode.set(message.getPayload().replaceAll(".*\"lobbyCode\":\"([^\"]+)\".*", "$1"));
+                    lobbyCreatedLatch.countDown();
+                } else if (message.getPayload().contains("\"type\":\"GAME_STARTING\"")) {
+                    gameStartingLatch.countDown();
+                } else {
+                    hostHandler.handleMessage(session, message);
+                }
+            }
+        }, "ws://localhost:" + port + "/ws/game?playerName=Host").get(5, TimeUnit.SECONDS);
+
+        hostSession.sendMessage(new TextMessage("{\"type\":\"CREATE_LOBBY\",\"data\":{}}"));
+        assertThat(lobbyCreatedLatch.await(5, TimeUnit.SECONDS)).isTrue();
+
+        client.execute(new TextWebSocketHandler() {
+            @Override
+            protected void handleTextMessage(WebSocketSession session, TextMessage message) {
+                if (message.getPayload().contains("\"type\":\"LOBBY_STATE\"")) {
+                    joinedLatch.countDown();
+                }
+            }
+        }, "ws://localhost:" + port + "/ws/game?playerName=Player2").get(5, TimeUnit.SECONDS)
+                .sendMessage(new TextMessage(
+                        "{\"type\":\"JOIN_LOBBY\",\"data\":{\"lobbyCode\":\"" + lobbyCode.get() + "\"}}"));
+
+        assertThat(joinedLatch.await(5, TimeUnit.SECONDS)).isTrue();
+        hostSession.sendMessage(new TextMessage("{\"type\":\"START_GAME\",\"data\":{}}"));
+        assertThat(gameStartingLatch.await(5, TimeUnit.SECONDS)).isTrue();
+
+        return hostSession;
+    }
 }

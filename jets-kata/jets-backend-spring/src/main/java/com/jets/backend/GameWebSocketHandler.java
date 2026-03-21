@@ -5,15 +5,18 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
+import java.util.List;
 import java.util.UUID;
 
 @Component
 public class GameWebSocketHandler extends TextWebSocketHandler {
 
     private final LobbyService lobbyService;
+    private final GameService gameService;
 
-    public GameWebSocketHandler(LobbyService lobbyService) {
+    public GameWebSocketHandler(LobbyService lobbyService, GameService gameService) {
         this.lobbyService = lobbyService;
+        this.gameService = gameService;
     }
 
     @Override
@@ -91,10 +94,22 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                 return;
             }
             lobbyService.startGame(lobbyCode);
+            List<WebSocketSession> sessions = lobbyService.getSessions(lobbyCode);
             String response = "{\"type\":\"GAME_STARTING\",\"data\":{}}";
-            for (WebSocketSession s : lobbyService.getSessions(lobbyCode)) {
+            for (WebSocketSession s : sessions) {
                 s.sendMessage(new TextMessage(response));
             }
+            gameService.startGame(lobbyCode, lobbyService.getPlayers(lobbyCode), sessions);
+
+        } else if (payload.contains("\"type\":\"PLAYER_INPUT\"")) {
+            String lobbyCode = lobbyService.getLobbyCodeForSession(session);
+            String playerId = (String) session.getAttributes().get("playerId");
+            boolean up    = payload.contains("\"up\":true");
+            boolean down  = payload.contains("\"down\":true");
+            boolean left  = payload.contains("\"left\":true");
+            boolean right = payload.contains("\"right\":true");
+            boolean shoot = payload.contains("\"shoot\":true");
+            gameService.handleInput(lobbyCode, playerId, up, down, left, right, shoot);
 
         } else if (payload.contains("\"type\":\"PING\"")) {
             long timestamp = Long.parseLong(payload.replaceAll(".*\"timestamp\":(\\d+).*", "$1"));
