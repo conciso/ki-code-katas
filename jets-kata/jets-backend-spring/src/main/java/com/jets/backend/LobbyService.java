@@ -12,7 +12,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class LobbyService {
 
     private final Map<String, WebSocketSession> sessionRegistry = new ConcurrentHashMap<>(); // sessionId -> session
-    private final Map<String, String> hostIds = new ConcurrentHashMap<>();                    // lobbyCode -> hostId
+    private final Map<String, String> hostPlayerIds = new ConcurrentHashMap<>();              // lobbyCode -> playerId (für Protokoll)
+    private final Map<String, String> hostSessionIds = new ConcurrentHashMap<>();             // lobbyCode -> sessionId (für Validierung)
     private final Map<String, List<String>> lobbySessionIds = new ConcurrentHashMap<>();      // lobbyCode -> sessionIds
     private final java.util.Set<String> activeGames = ConcurrentHashMap.newKeySet();          // lobbyCode
 
@@ -20,8 +21,9 @@ public class LobbyService {
         sessionRegistry.put(session.getId(), session);
     }
 
-    public void createLobby(String lobbyCode, String hostId, WebSocketSession hostSession) {
-        hostIds.put(lobbyCode, hostId);
+    public void createLobby(String lobbyCode, String hostPlayerId, WebSocketSession hostSession) {
+        hostPlayerIds.put(lobbyCode, hostPlayerId);
+        hostSessionIds.put(lobbyCode, hostSession.getId());
         lobbySessionIds.put(lobbyCode, new CopyOnWriteArrayList<>(List.of(hostSession.getId())));
     }
 
@@ -30,7 +32,7 @@ public class LobbyService {
     }
 
     public boolean lobbyExists(String lobbyCode) {
-        return hostIds.containsKey(lobbyCode);
+        return hostPlayerIds.containsKey(lobbyCode);
     }
 
     public boolean lobbyFull(String lobbyCode) {
@@ -46,12 +48,11 @@ public class LobbyService {
     }
 
     public boolean isHost(String lobbyCode, WebSocketSession session) {
-        String hostId = hostIds.get(lobbyCode);
-        return hostId != null && hostId.equals(session.getAttributes().get("playerId"));
+        return session.getId().equals(hostSessionIds.get(lobbyCode));
     }
 
     public String getHostId(String lobbyCode) {
-        return hostIds.get(lobbyCode);
+        return hostPlayerIds.get(lobbyCode);
     }
 
     public List<WebSocketSession> getSessions(String lobbyCode) {
