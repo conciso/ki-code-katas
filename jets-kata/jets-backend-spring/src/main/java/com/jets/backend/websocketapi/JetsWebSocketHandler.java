@@ -2,8 +2,10 @@ package com.jets.backend.websocketapi;
 
 import com.jets.backend.core.model.Lobby;
 import com.jets.backend.core.model.PlayerInfo;
+import com.jets.backend.core.service.JoinLobbyUseCase;
 import com.jets.backend.core.service.LobbyException;
 import com.jets.backend.core.service.LobbyService;
+import com.jets.backend.core.service.SetPlayerReadyUseCase;
 import com.jets.backend.core.service.StartGameUseCase;
 import tools.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
@@ -24,14 +26,24 @@ public class JetsWebSocketHandler extends TextWebSocketHandler {
 
     private final ObjectMapper objectMapper;
     private final LobbyService lobbyService;
+    private final JoinLobbyUseCase joinLobbyUseCase;
+    private final SetPlayerReadyUseCase setPlayerReadyUseCase;
     private final StartGameUseCase startGameUseCase;
     private final Map<String, PlayerInfo> players = new ConcurrentHashMap<>();
     private final Map<String, String> playerLobby = new ConcurrentHashMap<>();
     private final Map<MessageType, MessageHandler> handlers = new HashMap<>();
 
-    public JetsWebSocketHandler(ObjectMapper objectMapper, LobbyService lobbyService, StartGameUseCase startGameUseCase) {
+    public JetsWebSocketHandler(
+            ObjectMapper objectMapper,
+            LobbyService lobbyService,
+            JoinLobbyUseCase joinLobbyUseCase,
+            SetPlayerReadyUseCase setPlayerReadyUseCase,
+            StartGameUseCase startGameUseCase
+    ) {
         this.objectMapper = objectMapper;
         this.lobbyService = lobbyService;
+        this.joinLobbyUseCase = joinLobbyUseCase;
+        this.setPlayerReadyUseCase = setPlayerReadyUseCase;
         this.startGameUseCase = startGameUseCase;
         initializeHandlers();
     }
@@ -76,7 +88,7 @@ public class JetsWebSocketHandler extends TextWebSocketHandler {
     private void handleJoinLobby(WebSocketSession session, String lobbyCode) throws Exception {
         PlayerInfo player = players.get(session.getId());
         try {
-            lobbyService.joinLobby(lobbyCode, player);
+            joinLobbyUseCase.execute(lobbyCode, player);
         } catch (LobbyException e) {
             send(session, WsMessage.error(new ErrorData(e.getErrorCode(), e.getMessage())));
             return;
@@ -88,7 +100,7 @@ public class JetsWebSocketHandler extends TextWebSocketHandler {
     private void handlePlayerReady(WebSocketSession session, boolean ready) throws Exception {
         PlayerInfo player = players.get(session.getId());
         String lobbyCode = playerLobby.get(session.getId());
-        lobbyService.setPlayerReady(lobbyCode, player.id(), ready);
+        setPlayerReadyUseCase.execute(lobbyCode, player.id(), ready);
         broadcastLobbyState(lobbyCode);
     }
 
