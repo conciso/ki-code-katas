@@ -1,3 +1,7 @@
+using System.Net.WebSockets;
+using System.Text;
+using System.Text.Json;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -19,7 +23,7 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-app.Map("/ws", async context =>
+app.Map("/ws/game", async context =>
 {
     using var ws = await context.WebSockets.AcceptWebSocketAsync();
     var buffer = new byte[1024];
@@ -27,17 +31,36 @@ app.Map("/ws", async context =>
     while (true)
     {
         var result = await ws.ReceiveAsync(buffer, CancellationToken.None);
-        if (result.MessageType == System.Net.WebSockets.WebSocketMessageType.Close)
+        if (result.MessageType == WebSocketMessageType.Close)
             break;
 
-        await ws.SendAsync(
-            buffer.AsMemory(0, result.Count),
-            result.MessageType,
-            result.EndOfMessage,
-            CancellationToken.None);
+        var message = Encoding.UTF8.GetString(buffer, 0, result.Count);
+        var response = HandleMessage(message);
+
+        var responseBytes = Encoding.UTF8.GetBytes(response);
+        await ws.SendAsync(responseBytes, WebSocketMessageType.Text, true, CancellationToken.None);
     }
 });
 
+static string HandleMessage(string message)
+{
+    try
+    {
+        using var doc = JsonDocument.Parse(message);
+        var type = doc.RootElement.GetProperty("type").GetString();
+
+        if (type == "ping")
+        {
+            var timestamp = doc.RootElement.GetProperty("timestamp").GetInt64();
+            return JsonSerializer.Serialize(new { type = "pong", timestamp });
+        }
+    }
+    catch (Exception) { }
+
+    return message;
+}
+
 app.Run();
+
 
 public partial class Program { }
