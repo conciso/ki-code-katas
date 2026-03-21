@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { Lobby } from '@/types'
+import type { Lobby, GameState, GameStarting, WaveComplete, GameOver } from '@/types'
 
 export const useGameStore = defineStore('game', () => {
   const isConnected = ref(false)
@@ -11,10 +11,10 @@ export const useGameStore = defineStore('game', () => {
   const latency = ref<number | null>(null)
   const lobby = ref<Lobby | null>(null)
   const isHost = computed(() => !!lobby.value && lobby.value.hostId === playerId.value)
-  const gameStarting = ref<Record<string, unknown> | null>(null)
-  const gameState = ref<Record<string, unknown> | null>(null)
-  const waveComplete = ref<Record<string, unknown> | null>(null)
-  const gameOver = ref<Record<string, unknown> | null>(null)
+  const gameStarting = ref<GameStarting | null>(null)
+  const gameState = ref<GameState | null>(null)
+  const waveComplete = ref<WaveComplete | null>(null)
+  const gameOver = ref<GameOver | null>(null)
   let socket: WebSocket | null = null
   let pingSentAt: number | null = null
   let inputSeq = 0
