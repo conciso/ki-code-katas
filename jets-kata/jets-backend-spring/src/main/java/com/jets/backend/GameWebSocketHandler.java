@@ -44,6 +44,11 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                         "{\"type\":\"ERROR\",\"data\":{\"code\":\"LOBBY_NOT_FOUND\",\"message\":\"Lobby nicht gefunden\"}}"));
                 return;
             }
+            if (lobbyService.gameInProgress(lobbyCode)) {
+                session.sendMessage(new TextMessage(
+                        "{\"type\":\"ERROR\",\"data\":{\"code\":\"GAME_IN_PROGRESS\",\"message\":\"Das Spiel hat bereits begonnen\"}}"));
+                return;
+            }
             if (lobbyService.lobbyFull(lobbyCode)) {
                 session.sendMessage(new TextMessage(
                         "{\"type\":\"ERROR\",\"data\":{\"code\":\"LOBBY_FULL\",\"message\":\"Die Lobby ist voll (max. 4 Spieler)\"}}"));
@@ -59,6 +64,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             }
         } else if (message.getPayload().contains("\"type\":\"START_GAME\"")) {
             String lobbyCode = lobbyService.getLobbyCodeForSession(session);
+            lobbyService.startGame(lobbyCode);
             String response = "{\"type\":\"GAME_STARTING\",\"data\":{}}";
             for (WebSocketSession s : lobbyService.getSessions(lobbyCode)) {
                 s.sendMessage(new TextMessage(response));

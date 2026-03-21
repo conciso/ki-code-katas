@@ -14,6 +14,7 @@ public class LobbyService {
     private final Map<String, WebSocketSession> sessionRegistry = new ConcurrentHashMap<>(); // sessionId -> session
     private final Map<String, String> hostIds = new ConcurrentHashMap<>();                    // lobbyCode -> hostId
     private final Map<String, List<String>> lobbySessionIds = new ConcurrentHashMap<>();      // lobbyCode -> sessionIds
+    private final java.util.Set<String> activeGames = ConcurrentHashMap.newKeySet();          // lobbyCode
 
     public void registerSession(WebSocketSession session) {
         sessionRegistry.put(session.getId(), session);
@@ -34,6 +35,14 @@ public class LobbyService {
 
     public boolean lobbyFull(String lobbyCode) {
         return lobbySessionIds.getOrDefault(lobbyCode, List.of()).size() >= 4;
+    }
+
+    public void startGame(String lobbyCode) {
+        activeGames.add(lobbyCode);
+    }
+
+    public boolean gameInProgress(String lobbyCode) {
+        return activeGames.contains(lobbyCode);
     }
 
     public String getHostId(String lobbyCode) {
