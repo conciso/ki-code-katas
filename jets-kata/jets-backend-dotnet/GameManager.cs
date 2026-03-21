@@ -12,6 +12,7 @@ public class GameManager
     private readonly ConcurrentDictionary<string, Player> _players = new();
     private readonly ConcurrentDictionary<string, Lobby> _lobbies = new();
     private readonly ConcurrentDictionary<string, string> _playerLobby = new(); // playerId -> lobbyCode
+    private readonly ConcurrentDictionary<string, GameSession> _lobbySessions = new(); // lobbyCode -> GameSession
 
     public async Task HandleConnectionAsync(WebSocket socket, string playerName)
     {
@@ -95,6 +96,10 @@ public class GameManager
                     await HandleStartGame(player);
                     break;
 
+                case "PLAYER_INPUT":
+                    HandlePlayerInput(player, doc.RootElement.GetProperty("data"));
+                    break;
+
                 default:
                     await SendAsync(player.Socket, ErrorResponse("INVALID_MESSAGE", $"Unknown message type: {type}"));
                     break;
@@ -130,6 +135,12 @@ public class GameManager
         if (!_lobbies.TryGetValue(lobbyCode, out var lobby))
         {
             await SendAsync(player.Socket, ErrorResponse("LOBBY_NOT_FOUND", "Lobby-Code existiert nicht"));
+            return;
+        }
+
+        if (_lobbySessions.ContainsKey(lobbyCode))
+        {
+            await SendAsync(player.Socket, ErrorResponse("GAME_IN_PROGRESS", "Spiel hat bereits begonnen"));
             return;
         }
 
@@ -214,6 +225,109 @@ public class GameManager
         {
             if (_players.TryGetValue(lp.Id, out var cp) && cp.Socket.State == WebSocketState.Open)
                 await SendAsync(cp.Socket, gameStarting);
+        }
+
+        var session = new GameSession(
+            lobby.Players.Select(p => (p.Id, p.Name, p.Color)).ToList());
+        _lobbySessions[lobby.Code] = session;
+
+        _ = RunGameLoop(session, lobby);
+    }
+
+    private void HandlePlayerInput(Player player, JsonElement data)
+    {
+        if (!_playerLobby.TryGetValue(player.Id, out var code))
+            return;
+        if (!_lobbySessions.TryGetValue(code, out var session))
+            return;
+
+        session.SetInput(player.Id, new PlayerInput
+        {
+            Left = data.GetProperty("left").GetBoolean(),
+            Right = data.GetProperty("right").GetBoolean(),
+            Up = data.GetProperty("up").GetBoolean(),
+            Down = data.GetProperty("down").GetBoolean(),
+            Shoot = data.GetProperty("shoot").GetBoolean(),
+            Seq = data.GetProperty("seq").GetInt32()
+        });
+    }
+
+    private async Task RunGameLoop(GameSession session, Lobby lobby)
+    {
+        var tickInterval = TimeSpan.FromMilliseconds(1000.0 / ServerTickRate);
+
+        while (session.IsRunning)
+        {
+            var events = session.Tick();
+            await BroadcastGameState(session, lobby);
+            await Task.Delay(tickInterval);
+        }
+
+        await BroadcastGameOver(session, lobby);
+        _lobbySessions.TryRemove(lobby.Code, out _);
+    }
+
+    private async Task BroadcastGameState(GameSession session, Lobby lobby)
+    {
+        var state = new
+        {
+            type = "GAME_STATE",
+            data = new
+            {
+                tick = session.TickCount,
+                players = session.Players.Select(p => new
+                {
+                    id = p.Id,
+                    x = p.X,
+                    y = p.Y,
+                    hp = p.HP,
+                    score = p.Score,
+                    alive = p.Alive,
+                    respawnIn = p.RespawnIn,
+                    invincible = p.Invincible,
+                    lastProcessedInput = p.LastProcessedInput
+                }),
+                projectiles = session.Projectiles.Select(p => new
+                {
+                    id = p.Id,
+                    x = p.X,
+                    y = p.Y,
+                    vx = p.Vx,
+                    vy = p.Vy,
+                    owner = p.Owner
+                })
+            }
+        };
+
+        foreach (var lp in lobby.Players)
+        {
+            if (_players.TryGetValue(lp.Id, out var cp) && cp.Socket.State == WebSocketState.Open)
+                await SendAsync(cp.Socket, state);
+        }
+    }
+
+    private async Task BroadcastGameOver(GameSession session, Lobby lobby)
+    {
+        var gameOver = new
+        {
+            type = "GAME_OVER",
+            data = new
+            {
+                reason = session.GameOverReason,
+                finalScores = session.FinalScores.Select(s => new
+                {
+                    playerId = s.PlayerId,
+                    name = s.Name,
+                    score = s.Score,
+                    kills = s.Kills
+                })
+            }
+        };
+
+        foreach (var lp in lobby.Players)
+        {
+            if (_players.TryGetValue(lp.Id, out var cp) && cp.Socket.State == WebSocketState.Open)
+                await SendAsync(cp.Socket, gameOver);
         }
     }
 
