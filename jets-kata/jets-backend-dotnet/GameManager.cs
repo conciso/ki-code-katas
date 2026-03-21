@@ -10,6 +10,7 @@ public class GameManager
     private const int ServerTickRate = 30;
 
     private readonly ConcurrentDictionary<string, Player> _players = new();
+    private readonly ConcurrentDictionary<string, Lobby> _lobbies = new();
 
     public async Task HandleConnectionAsync(WebSocket socket, string playerName)
     {
@@ -51,37 +52,109 @@ public class GameManager
                     break;
 
                 var message = Encoding.UTF8.GetString(buffer, 0, result.Count);
-                var response = HandleMessage(message);
-                await SendAsync(player.Socket, response);
+                await HandleMessageAsync(player, message);
             }
         }
         catch (WebSocketException) { }
     }
 
-    private static object HandleMessage(string message)
+    private async Task HandleMessageAsync(Player player, string message)
     {
         try
         {
             using var doc = JsonDocument.Parse(message);
             var type = doc.RootElement.GetProperty("type").GetString();
 
-            return type switch
+            switch (type)
             {
-                "PING" => new
-                {
-                    type = "PONG",
-                    data = new { timestamp = doc.RootElement.GetProperty("data").GetProperty("timestamp").GetInt64() }
-                },
-                _ => ErrorResponse("INVALID_MESSAGE", $"Unknown message type: {type}")
-            };
+                case "PING":
+                    var timestamp = doc.RootElement.GetProperty("data").GetProperty("timestamp").GetInt64();
+                    await SendAsync(player.Socket, new { type = "PONG", data = new { timestamp } });
+                    break;
+
+                case "CREATE_LOBBY":
+                    await HandleCreateLobby(player);
+                    break;
+
+                case "JOIN_LOBBY":
+                    var lobbyCode = doc.RootElement.GetProperty("data").GetProperty("lobbyCode").GetString()!;
+                    await HandleJoinLobby(player, lobbyCode);
+                    break;
+
+                default:
+                    await SendAsync(player.Socket, ErrorResponse("INVALID_MESSAGE", $"Unknown message type: {type}"));
+                    break;
+            }
         }
         catch (JsonException)
         {
-            return ErrorResponse("INVALID_MESSAGE", "Message is not valid JSON");
+            await SendAsync(player.Socket, ErrorResponse("INVALID_MESSAGE", "Message is not valid JSON"));
         }
         catch (KeyNotFoundException)
         {
-            return ErrorResponse("INVALID_MESSAGE", "Message is missing required fields");
+            await SendAsync(player.Socket, ErrorResponse("INVALID_MESSAGE", "Message is missing required fields"));
+        }
+    }
+
+    private async Task HandleCreateLobby(Player player)
+    {
+        var lobby = new Lobby(player);
+        _lobbies[lobby.Code] = lobby;
+
+        await SendAsync(player.Socket, new
+        {
+            type = "LOBBY_CREATED",
+            data = new { lobbyCode = lobby.Code, hostId = lobby.HostId }
+        });
+
+        await SendLobbyState(lobby);
+    }
+
+    private async Task HandleJoinLobby(Player player, string lobbyCode)
+    {
+        if (!_lobbies.TryGetValue(lobbyCode, out var lobby))
+        {
+            await SendAsync(player.Socket, ErrorResponse("LOBBY_NOT_FOUND", "Lobby-Code existiert nicht"));
+            return;
+        }
+
+        if (lobby.IsFull)
+        {
+            await SendAsync(player.Socket, ErrorResponse("LOBBY_FULL", "Die Lobby ist voll (max. 4 Spieler)"));
+            return;
+        }
+
+        lobby.AddPlayer(player);
+        await SendLobbyState(lobby);
+    }
+
+    private async Task SendLobbyState(Lobby lobby)
+    {
+        var state = new
+        {
+            type = "LOBBY_STATE",
+            data = new
+            {
+                lobbyCode = lobby.Code,
+                hostId = lobby.HostId,
+                gameMode = lobby.GameMode,
+                players = lobby.Players.Select(p => new
+                {
+                    id = p.Id,
+                    name = p.Name,
+                    ready = p.Ready,
+                    color = p.Color
+                })
+            }
+        };
+
+        foreach (var lobbyPlayer in lobby.Players)
+        {
+            if (_players.TryGetValue(lobbyPlayer.Id, out var connectedPlayer)
+                && connectedPlayer.Socket.State == WebSocketState.Open)
+            {
+                await SendAsync(connectedPlayer.Socket, state);
+            }
         }
     }
 
