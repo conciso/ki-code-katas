@@ -510,3 +510,362 @@ describe('useGameStore — Lobby erstellen', () => {
     expect(store.isHost).toBe(false)
   })
 })
+
+describe('useGameStore — Lobby beitreten', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    MockWebSocket.instances = []
+    vi.stubGlobal('WebSocket', MockWebSocket)
+  })
+
+  function connectAndOpen(store: ReturnType<typeof useGameStore>, playerName = 'Bob') {
+    store.connect(playerName)
+    const ws = MockWebSocket.instances[0]!
+    ws.simulateOpen()
+    ws.simulateMessage({ type: 'CONNECTED', data: { playerId: 'p2d5e6f7', serverTickRate: 30 } })
+    return ws
+  }
+
+  it('joinLobby() sendet JOIN_LOBBY mit lobbyCode und Spielernamen', () => {
+    const store = useGameStore()
+    const ws = connectAndOpen(store, 'Bob')
+
+    store.joinLobby('A3F9K2')
+
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: 'JOIN_LOBBY', data: { lobbyCode: 'A3F9K2', playerName: 'Bob' } }),
+    )
+  })
+
+  it('isHost ist false nach dem Beitreten', () => {
+    const store = useGameStore()
+    const ws = connectAndOpen(store, 'Bob')
+
+    store.joinLobby('A3F9K2')
+    ws.simulateMessage({
+      type: 'LOBBY_STATE',
+      data: { lobbyCode: 'A3F9K2', hostId: 'p1a2b3c4', gameMode: 'COOP', players: [] },
+    })
+
+    expect(store.isHost).toBe(false)
+  })
+
+  it('lobby enthält den Zustand nach LOBBY_STATE', () => {
+    const store = useGameStore()
+    const ws = connectAndOpen(store, 'Bob')
+
+    store.joinLobby('A3F9K2')
+    ws.simulateMessage({
+      type: 'LOBBY_STATE',
+      data: {
+        lobbyCode: 'A3F9K2',
+        hostId: 'p1a2b3c4',
+        gameMode: 'COOP',
+        players: [
+          { id: 'p1a2b3c4', name: 'Alice', ready: true, color: '#FF4444' },
+          { id: 'p2d5e6f7', name: 'Bob', ready: false, color: '#4444FF' },
+        ],
+      },
+    })
+
+    expect(store.lobby).toMatchObject({
+      lobbyCode: 'A3F9K2',
+      players: [{ name: 'Alice' }, { name: 'Bob' }],
+    })
+  })
+})
+
+// ─── Hilfsfunktion für alle folgenden Suites ───────────────────────────────
+
+function makeConnectedStore() {
+  const store = useGameStore()
+  store.connect('Alice')
+  const ws = MockWebSocket.instances[0]!
+  ws.simulateOpen()
+  ws.simulateMessage({ type: 'CONNECTED', data: { playerId: 'p1a2b3c4', serverTickRate: 30 } })
+  return { store, ws }
+}
+
+// ─── Lobby-Aktionen ────────────────────────────────────────────────────────
+
+describe('useGameStore — setGameMode', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    MockWebSocket.instances = []
+    vi.stubGlobal('WebSocket', MockWebSocket)
+  })
+
+  it('sendet SET_GAME_MODE mit dem gewählten Modus', () => {
+    const { store, ws } = makeConnectedStore()
+
+    store.setGameMode('FFA')
+
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: 'SET_GAME_MODE', data: { gameMode: 'FFA' } }),
+    )
+  })
+
+  it('sendet SET_GAME_MODE mit COOP', () => {
+    const { store, ws } = makeConnectedStore()
+
+    store.setGameMode('COOP')
+
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: 'SET_GAME_MODE', data: { gameMode: 'COOP' } }),
+    )
+  })
+})
+
+describe('useGameStore — setReady', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    MockWebSocket.instances = []
+    vi.stubGlobal('WebSocket', MockWebSocket)
+  })
+
+  it('sendet PLAYER_READY mit ready=true', () => {
+    const { store, ws } = makeConnectedStore()
+
+    store.setReady(true)
+
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: 'PLAYER_READY', data: { ready: true } }),
+    )
+  })
+
+  it('sendet PLAYER_READY mit ready=false', () => {
+    const { store, ws } = makeConnectedStore()
+
+    store.setReady(false)
+
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: 'PLAYER_READY', data: { ready: false } }),
+    )
+  })
+})
+
+describe('useGameStore — startGame', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    MockWebSocket.instances = []
+    vi.stubGlobal('WebSocket', MockWebSocket)
+  })
+
+  it('sendet START_GAME', () => {
+    const { store, ws } = makeConnectedStore()
+
+    store.startGame()
+
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: 'START_GAME', data: {} }),
+    )
+  })
+})
+
+describe('useGameStore — leaveLobby', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    MockWebSocket.instances = []
+    vi.stubGlobal('WebSocket', MockWebSocket)
+  })
+
+  it('sendet LEAVE_LOBBY', () => {
+    const { store, ws } = makeConnectedStore()
+
+    store.leaveLobby()
+
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: 'LEAVE_LOBBY', data: {} }),
+    )
+  })
+
+  it('setzt lobby auf null', () => {
+    const { store, ws } = makeConnectedStore()
+    ws.simulateMessage({ type: 'LOBBY_CREATED', data: { lobbyCode: 'A3F9K2', hostId: 'p1a2b3c4' } })
+
+    store.leaveLobby()
+
+    expect(store.lobby).toBeNull()
+  })
+})
+
+describe('useGameStore — returnToLobby', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    MockWebSocket.instances = []
+    vi.stubGlobal('WebSocket', MockWebSocket)
+  })
+
+  it('sendet RETURN_TO_LOBBY', () => {
+    const { store, ws } = makeConnectedStore()
+
+    store.returnToLobby()
+
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: 'RETURN_TO_LOBBY', data: {} }),
+    )
+  })
+})
+
+// ─── Spielaktionen ─────────────────────────────────────────────────────────
+
+describe('useGameStore — sendInput', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    MockWebSocket.instances = []
+    vi.stubGlobal('WebSocket', MockWebSocket)
+  })
+
+  it('sendet PLAYER_INPUT mit dem aktuellen Input-Zustand', () => {
+    const { store, ws } = makeConnectedStore()
+
+    store.sendInput({ up: false, down: false, left: true, right: false, shoot: true })
+
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: 'PLAYER_INPUT', data: { up: false, down: false, left: true, right: false, shoot: true, seq: 1 } }),
+    )
+  })
+
+  it('erhöht die Sequenznummer bei jedem Input', () => {
+    const { store, ws } = makeConnectedStore()
+
+    store.sendInput({ up: true, down: false, left: false, right: false, shoot: false })
+    store.sendInput({ up: false, down: false, left: false, right: true, shoot: false })
+
+    const calls = ws.send.mock.calls
+    expect(JSON.parse(calls[0]![0]).data.seq).toBe(1)
+    expect(JSON.parse(calls[1]![0]).data.seq).toBe(2)
+  })
+})
+
+// ─── Eingehende Spielnachrichten ───────────────────────────────────────────
+
+describe('useGameStore — GAME_STARTING', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    MockWebSocket.instances = []
+    vi.stubGlobal('WebSocket', MockWebSocket)
+  })
+
+  it('gameStarting ist initial null', () => {
+    const store = useGameStore()
+    expect(store.gameStarting).toBeNull()
+  })
+
+  it('speichert GAME_STARTING-Daten', () => {
+    const { store, ws } = makeConnectedStore()
+
+    ws.simulateMessage({
+      type: 'GAME_STARTING',
+      data: { countdown: 3, gameMode: 'COOP', fieldWidth: 1920, fieldHeight: 1080, players: [] },
+    })
+
+    expect(store.gameStarting).toMatchObject({ countdown: 3, gameMode: 'COOP' })
+  })
+})
+
+describe('useGameStore — GAME_STATE', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    MockWebSocket.instances = []
+    vi.stubGlobal('WebSocket', MockWebSocket)
+  })
+
+  it('gameState ist initial null', () => {
+    const store = useGameStore()
+    expect(store.gameState).toBeNull()
+  })
+
+  it('speichert den letzten GAME_STATE', () => {
+    const { store, ws } = makeConnectedStore()
+
+    ws.simulateMessage({
+      type: 'GAME_STATE',
+      data: {
+        tick: 1847,
+        players: [{ id: 'p1a2b3c4', x: 450.5, y: 320.0, hp: 3, score: 1200, alive: true }],
+        projectiles: [],
+        enemies: [],
+        powerUps: [],
+        wave: 3,
+        enemiesRemaining: 8,
+      },
+    })
+
+    expect(store.gameState).toMatchObject({ tick: 1847, wave: 3 })
+  })
+
+  it('überschreibt den vorherigen GAME_STATE', () => {
+    const { store, ws } = makeConnectedStore()
+
+    ws.simulateMessage({ type: 'GAME_STATE', data: { tick: 1, players: [], projectiles: [], enemies: [], powerUps: [], wave: 1, enemiesRemaining: 5 } })
+    ws.simulateMessage({ type: 'GAME_STATE', data: { tick: 2, players: [], projectiles: [], enemies: [], powerUps: [], wave: 1, enemiesRemaining: 4 } })
+
+    expect(store.gameState?.tick).toBe(2)
+  })
+})
+
+describe('useGameStore — WAVE_COMPLETE', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    MockWebSocket.instances = []
+    vi.stubGlobal('WebSocket', MockWebSocket)
+  })
+
+  it('waveComplete ist initial null', () => {
+    const store = useGameStore()
+    expect(store.waveComplete).toBeNull()
+  })
+
+  it('speichert WAVE_COMPLETE-Daten', () => {
+    const { store, ws } = makeConnectedStore()
+
+    ws.simulateMessage({
+      type: 'WAVE_COMPLETE',
+      data: { wave: 3, nextWaveIn: 5, scores: { p1a2b3c4: 1200, p2d5e6f7: 800 } },
+    })
+
+    expect(store.waveComplete).toMatchObject({ wave: 3, nextWaveIn: 5 })
+  })
+})
+
+describe('useGameStore — GAME_OVER', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    MockWebSocket.instances = []
+    vi.stubGlobal('WebSocket', MockWebSocket)
+  })
+
+  it('gameOver ist initial null', () => {
+    const store = useGameStore()
+    expect(store.gameOver).toBeNull()
+  })
+
+  it('speichert GAME_OVER-Daten', () => {
+    const { store, ws } = makeConnectedStore()
+
+    ws.simulateMessage({
+      type: 'GAME_OVER',
+      data: {
+        reason: 'ALL_DEAD',
+        finalScores: [{ playerId: 'p1a2b3c4', name: 'Alice', score: 4500, kills: 32 }],
+        totalScore: 4500,
+        wavesCompleted: 7,
+      },
+    })
+
+    expect(store.gameOver).toMatchObject({ reason: 'ALL_DEAD', wavesCompleted: 7 })
+  })
+
+  it('setzt gameOver auf null wenn returnToLobby aufgerufen wird', () => {
+    const { store, ws } = makeConnectedStore()
+    ws.simulateMessage({
+      type: 'GAME_OVER',
+      data: { reason: 'ALL_DEAD', finalScores: [], totalScore: 0, wavesCompleted: 1 },
+    })
+
+    store.returnToLobby()
+
+    expect(store.gameOver).toBeNull()
+  })
+})

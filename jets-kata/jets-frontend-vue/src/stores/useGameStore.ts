@@ -10,8 +10,13 @@ export const useGameStore = defineStore('game', () => {
   const latency = ref<number | null>(null)
   const lobby = ref<{ hostId: string; [key: string]: unknown } | null>(null)
   const isHost = computed(() => !!lobby.value && lobby.value.hostId === playerId.value)
+  const gameStarting = ref<Record<string, unknown> | null>(null)
+  const gameState = ref<Record<string, unknown> | null>(null)
+  const waveComplete = ref<Record<string, unknown> | null>(null)
+  const gameOver = ref<Record<string, unknown> | null>(null)
   let socket: WebSocket | null = null
   let pingSentAt: number | null = null
+  let inputSeq = 0
 
   function connect(name: string) {
     playerName.value = name
@@ -36,6 +41,14 @@ export const useGameStore = defineStore('game', () => {
         lobby.value = msg.data
       } else if (msg.type === 'DISCONNECTED') {
         gameEvents.value.push(msg.data)
+      } else if (msg.type === 'GAME_STARTING') {
+        gameStarting.value = msg.data
+      } else if (msg.type === 'GAME_STATE') {
+        gameState.value = msg.data
+      } else if (msg.type === 'WAVE_COMPLETE') {
+        waveComplete.value = msg.data
+      } else if (msg.type === 'GAME_OVER') {
+        gameOver.value = msg.data
       }
     }
 
@@ -53,5 +66,41 @@ export const useGameStore = defineStore('game', () => {
     socket?.send(JSON.stringify({ type: 'CREATE_LOBBY', data: { playerName: playerName.value } }))
   }
 
-  return { isConnected, playerId, playerName, gameEvents, lastError, latency, lobby, isHost, connect, ping, createLobby }
+  function joinLobby(lobbyCode: string) {
+    socket?.send(JSON.stringify({ type: 'JOIN_LOBBY', data: { lobbyCode, playerName: playerName.value } }))
+  }
+
+  function setGameMode(gameMode: 'COOP' | 'FFA') {
+    socket?.send(JSON.stringify({ type: 'SET_GAME_MODE', data: { gameMode } }))
+  }
+
+  function setReady(ready: boolean) {
+    socket?.send(JSON.stringify({ type: 'PLAYER_READY', data: { ready } }))
+  }
+
+  function startGame() {
+    socket?.send(JSON.stringify({ type: 'START_GAME', data: {} }))
+  }
+
+  function leaveLobby() {
+    socket?.send(JSON.stringify({ type: 'LEAVE_LOBBY', data: {} }))
+    lobby.value = null
+  }
+
+  function returnToLobby() {
+    socket?.send(JSON.stringify({ type: 'RETURN_TO_LOBBY', data: {} }))
+    gameOver.value = null
+  }
+
+  function sendInput(input: { up: boolean; down: boolean; left: boolean; right: boolean; shoot: boolean }) {
+    inputSeq += 1
+    socket?.send(JSON.stringify({ type: 'PLAYER_INPUT', data: { ...input, seq: inputSeq } }))
+  }
+
+  return {
+    isConnected, playerId, playerName, gameEvents, lastError, latency,
+    lobby, isHost, gameStarting, gameState, waveComplete, gameOver,
+    connect, ping, createLobby, joinLobby, setGameMode, setReady,
+    startGame, leaveLobby, returnToLobby, sendInput,
+  }
 })
