@@ -24,31 +24,26 @@
       Beitreten
     </BaseButton>
 
-    <ul v-if="store.lobby" class="player-list">
-      <li
-        v-for="player in store.lobby.players"
-        :key="player.id"
-        class="player-item"
-      >
-        <span class="player-color" :style="{ background: player.color }" />
-        <span class="player-name">{{ player.name }}</span>
-        <span class="player-ready" :class="{ ready: player.ready }">
-          {{ player.ready ? '✓ Bereit' : 'Warten…' }}
-        </span>
-      </li>
-    </ul>
+    <LobbyError />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useGameStore } from '@/stores/useGameStore'
 import BaseInput from './BaseInput.vue'
 import BaseButton from './BaseButton.vue'
+import LobbyError from './LobbyError.vue'
 
 const name = ref('')
 const lobbyCode = ref('')
 const store = useGameStore()
+const router = useRouter()
+
+watch(() => store.lobby, (lobby) => {
+  if (lobby) router.push('/lobby')
+})
 
 function handleJoin() {
   store.connect(name.value)
@@ -72,45 +67,6 @@ function handleJoin() {
     0 8px 40px rgba(0, 0, 0, 0.6);
 }
 
-.player-list {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.player-item {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  font-size: 0.9rem;
-}
-
-.player-color {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  box-shadow: 0 0 6px currentColor;
-}
-
-.player-name {
-  flex: 1;
-  color: var(--color-heading);
-}
-
-.player-ready {
-  font-size: 0.75rem;
-  letter-spacing: 0.05em;
-  color: var(--color-text-muted);
-}
-
-.player-ready.ready {
-  color: var(--color-success);
-}
 
 .panel-title {
   font-family: 'Orbitron', sans-serif;

@@ -14,22 +14,23 @@
     <BaseButton :disabled="!name" @click="handleCreate">
       Lobby erstellen
     </BaseButton>
-
-    <div v-if="store.lobby" class="lobby-code">
-      <span class="lobby-code-label">Lobby-Code</span>
-      <span class="lobby-code-value">{{ store.lobby.lobbyCode }}</span>
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useGameStore } from '@/stores/useGameStore'
 import BaseInput from './BaseInput.vue'
 import BaseButton from './BaseButton.vue'
 
 const name = ref('')
 const store = useGameStore()
+const router = useRouter()
+
+watch(() => store.lobby, (lobby) => {
+  if (lobby) router.push('/lobby')
+})
 
 function handleCreate() {
   store.connect(name.value)
