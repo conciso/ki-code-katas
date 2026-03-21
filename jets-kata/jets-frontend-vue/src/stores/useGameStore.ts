@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import type { Lobby } from '@/types'
 
 export const useGameStore = defineStore('game', () => {
   const isConnected = ref(false)
@@ -8,7 +9,7 @@ export const useGameStore = defineStore('game', () => {
   const gameEvents = ref<Record<string, unknown>[]>([])
   const lastError = ref<{ code: string; message: string } | null>(null)
   const latency = ref<number | null>(null)
-  const lobby = ref<{ hostId: string; [key: string]: unknown } | null>(null)
+  const lobby = ref<Lobby | null>(null)
   const isHost = computed(() => !!lobby.value && lobby.value.hostId === playerId.value)
   const gameStarting = ref<Record<string, unknown> | null>(null)
   const gameState = ref<Record<string, unknown> | null>(null)

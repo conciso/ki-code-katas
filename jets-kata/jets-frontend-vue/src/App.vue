@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import LobbyCreate from './components/LobbyCreate.vue'
+import { RouterView, RouterLink } from 'vue-router'
 </script>
 
 <template>
@@ -13,7 +13,13 @@ import LobbyCreate from './components/LobbyCreate.vue'
       <p class="game-subtitle">Multiplayer Space Combat</p>
     </header>
 
-    <LobbyCreate />
+    <nav class="game-nav">
+      <RouterLink to="/create" class="nav-link">Neue Lobby</RouterLink>
+      <span class="nav-divider">|</span>
+      <RouterLink to="/join" class="nav-link">Beitreten</RouterLink>
+    </nav>
+
+    <RouterView />
   </main>
 </template>
 
@@ -77,6 +83,38 @@ main {
   letter-spacing: 0.3em;
   text-transform: uppercase;
   color: var(--color-text-muted);
+}
+
+.game-nav {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.nav-link {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  transition: color 0.2s, background 0.2s;
+}
+
+.nav-link:hover {
+  color: var(--color-accent);
+}
+
+.nav-link.router-link-active {
+  color: var(--color-accent);
+  background: var(--color-accent-glow);
+}
+
+.nav-divider {
+  color: var(--color-border-hover);
+  user-select: none;
 }
 </style>
 

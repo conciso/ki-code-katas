@@ -2,21 +2,18 @@
   <div class="panel">
     <h2 class="panel-title">Neue Lobby</h2>
 
-    <div class="field">
-      <label class="field-label" for="player-name">Rufzeichen</label>
-      <input
-        id="player-name"
-        v-model="name"
-        class="field-input"
-        placeholder="Dein Name"
-        autocomplete="off"
-        maxlength="20"
-      />
-    </div>
+    <BaseInput
+      v-model="name"
+      label="Name"
+      id="player-name"
+      placeholder="Dein Name"
+      autocomplete="off"
+      maxlength="20"
+    />
 
-    <button class="btn-primary" :disabled="!name" @click="handleCreate">
+    <BaseButton :disabled="!name" @click="handleCreate">
       Lobby erstellen
-    </button>
+    </BaseButton>
 
     <div v-if="store.lobby" class="lobby-code">
       <span class="lobby-code-label">Lobby-Code</span>
@@ -28,6 +25,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useGameStore } from '@/stores/useGameStore'
+import BaseInput from './BaseInput.vue'
+import BaseButton from './BaseButton.vue'
 
 const name = ref('')
 const store = useGameStore()
@@ -61,64 +60,6 @@ function handleCreate() {
   text-transform: uppercase;
   color: var(--color-accent);
   text-align: center;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.field-label {
-  font-size: 0.75rem;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-}
-
-.field-input {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  color: var(--color-heading);
-  font-family: inherit;
-  font-size: 1rem;
-  padding: 0.6rem 0.9rem;
-  outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-.field-input::placeholder {
-  color: var(--color-text-muted);
-}
-
-.field-input:focus {
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px var(--color-accent-glow);
-}
-
-.btn-primary {
-  padding: 0.75rem 1.5rem;
-  background: transparent;
-  border: 1px solid var(--color-accent);
-  border-radius: 6px;
-  color: var(--color-accent);
-  font-family: 'Orbitron', sans-serif;
-  font-size: 0.8rem;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: background 0.2s, box-shadow 0.2s;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: var(--color-accent-glow);
-  box-shadow: 0 0 16px var(--color-accent-glow);
-}
-
-.btn-primary:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
 }
 
 .lobby-code {
