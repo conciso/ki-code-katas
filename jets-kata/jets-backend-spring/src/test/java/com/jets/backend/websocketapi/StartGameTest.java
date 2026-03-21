@@ -105,6 +105,33 @@ class StartGameTest {
         assertThat(error.get("code").stringValue()).isEqualTo("NOT_HOST");
     }
 
+    @Test
+    void shouldReturnErrorWhenNotAllPlayersAreReady() throws Exception {
+        var aliceMessages = new ArrayBlockingQueue<String>(20);
+        var bobMessages   = new ArrayBlockingQueue<String>(20);
+
+        WebSocketSession aliceSession = connect("Alice", aliceMessages);
+        receiveConnected(aliceMessages);
+        String lobbyCode = createLobby(aliceSession, aliceMessages);
+
+        WebSocketSession bobSession = connect("Bob", bobMessages);
+        receiveConnected(bobMessages);
+        sendJoinLobby(bobSession, lobbyCode);
+        receiveLobbyState(bobMessages);
+        receiveLobbyState(aliceMessages);
+
+        // Nur Alice ist bereit
+        sendPlayerReady(aliceSession, true);
+        receiveLobbyState(aliceMessages);
+        receiveLobbyState(bobMessages);
+
+        // Host versucht zu starten, obwohl Bob nicht ready ist
+        sendStartGame(aliceSession);
+
+        JsonNode error = receiveError(aliceMessages);
+        assertThat(error.get("code").stringValue()).isEqualTo("NOT_ALL_READY");
+    }
+
 
     // -------------------------------------------------------------------------
     // Hilfsmethoden
