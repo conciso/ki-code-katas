@@ -216,4 +216,28 @@ class WebSocketConnectionTest {
         assertThat(bobReceivedLobbyState.await(5, TimeUnit.SECONDS)).isTrue();
         assertThat(hostReceivedLobbyState.await(5, TimeUnit.SECONDS)).isTrue();
     }
+
+    @Test
+    void shouldReceiveErrorWhenJoiningNonExistentLobby() throws Exception {
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<String> errorMessage = new AtomicReference<>();
+
+        StandardWebSocketClient client = new StandardWebSocketClient();
+        WebSocketSession session = client.execute(new TextWebSocketHandler() {
+            @Override
+            protected void handleTextMessage(WebSocketSession session, TextMessage message) {
+                if (message.getPayload().contains("\"type\":\"ERROR\"")) {
+                    errorMessage.set(message.getPayload());
+                    latch.countDown();
+                }
+            }
+        }, "ws://localhost:" + port + "/ws/game?playerName=Alice").get(5, TimeUnit.SECONDS);
+
+        session.sendMessage(new TextMessage(
+                "{\"type\":\"JOIN_LOBBY\",\"data\":{\"lobbyCode\":\"DOESNOTEXIST\"}}"));
+
+        assertThat(latch.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(errorMessage.get()).contains("\"type\":\"ERROR\"");
+        assertThat(errorMessage.get()).contains("\"code\":\"LOBBY_NOT_FOUND\"");
+    }
 }

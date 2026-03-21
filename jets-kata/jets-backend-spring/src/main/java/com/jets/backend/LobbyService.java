@@ -28,6 +28,10 @@ public class LobbyService {
         lobbySessionIds.getOrDefault(lobbyCode, List.of()).add(session.getId());
     }
 
+    public boolean lobbyExists(String lobbyCode) {
+        return hostIds.containsKey(lobbyCode);
+    }
+
     public String getHostId(String lobbyCode) {
         return hostIds.get(lobbyCode);
     }

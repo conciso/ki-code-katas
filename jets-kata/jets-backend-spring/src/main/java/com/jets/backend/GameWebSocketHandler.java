@@ -39,6 +39,11 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             session.sendMessage(new TextMessage(response));
         } else if (message.getPayload().contains("\"type\":\"JOIN_LOBBY\"")) {
             String lobbyCode = message.getPayload().replaceAll(".*\"lobbyCode\":\"([^\"]+)\".*", "$1");
+            if (!lobbyService.lobbyExists(lobbyCode)) {
+                session.sendMessage(new TextMessage(
+                        "{\"type\":\"ERROR\",\"data\":{\"code\":\"LOBBY_NOT_FOUND\",\"message\":\"Lobby nicht gefunden\"}}"));
+                return;
+            }
             String hostId = lobbyService.getHostId(lobbyCode);
             lobbyService.joinLobby(lobbyCode, session);
             String response = """
