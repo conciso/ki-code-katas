@@ -45,6 +45,11 @@ public class LobbyService {
         return activeGames.contains(lobbyCode);
     }
 
+    public boolean isHost(String lobbyCode, WebSocketSession session) {
+        String hostId = hostIds.get(lobbyCode);
+        return hostId != null && hostId.equals(session.getAttributes().get("playerId"));
+    }
+
     public String getHostId(String lobbyCode) {
         return hostIds.get(lobbyCode);
     }

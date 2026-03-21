@@ -362,4 +362,53 @@ class WebSocketConnectionTest {
         assertThat(errorMessage.get()).contains("\"type\":\"ERROR\"");
         assertThat(errorMessage.get()).contains("\"code\":\"GAME_IN_PROGRESS\"");
     }
+
+    @Test
+    void shouldReceiveErrorWhenNonHostSendsStartGame() throws Exception {
+        // Host erstellt Lobby
+        AtomicReference<String> lobbyCode = new AtomicReference<>();
+        CountDownLatch lobbyCreatedLatch = new CountDownLatch(1);
+
+        StandardWebSocketClient client = new StandardWebSocketClient();
+        client.execute(new TextWebSocketHandler() {
+            @Override
+            protected void handleTextMessage(WebSocketSession session, TextMessage message) {
+                if (message.getPayload().contains("\"type\":\"LOBBY_CREATED\"")) {
+                    lobbyCode.set(message.getPayload().replaceAll(".*\"lobbyCode\":\"([^\"]+)\".*", "$1"));
+                    lobbyCreatedLatch.countDown();
+                }
+            }
+        }, "ws://localhost:" + port + "/ws/game?playerName=Host").get(5, TimeUnit.SECONDS)
+                .sendMessage(new TextMessage("{\"type\":\"CREATE_LOBBY\",\"data\":{}}"));
+
+        assertThat(lobbyCreatedLatch.await(5, TimeUnit.SECONDS)).isTrue();
+
+        // Player2 joined
+        CountDownLatch joinedLatch = new CountDownLatch(1);
+        CountDownLatch errorLatch = new CountDownLatch(1);
+        AtomicReference<String> errorMessage = new AtomicReference<>();
+
+        WebSocketSession player2 = client.execute(new TextWebSocketHandler() {
+            @Override
+            protected void handleTextMessage(WebSocketSession session, TextMessage message) {
+                if (message.getPayload().contains("\"type\":\"LOBBY_STATE\"")) {
+                    joinedLatch.countDown();
+                } else if (message.getPayload().contains("\"type\":\"ERROR\"")) {
+                    errorMessage.set(message.getPayload());
+                    errorLatch.countDown();
+                }
+            }
+        }, "ws://localhost:" + port + "/ws/game?playerName=Player2").get(5, TimeUnit.SECONDS);
+
+        player2.sendMessage(new TextMessage(
+                "{\"type\":\"JOIN_LOBBY\",\"data\":{\"lobbyCode\":\"" + lobbyCode.get() + "\"}}"));
+        assertThat(joinedLatch.await(5, TimeUnit.SECONDS)).isTrue();
+
+        // Player2 (kein Host) versucht START_GAME zu senden
+        player2.sendMessage(new TextMessage("{\"type\":\"START_GAME\",\"data\":{}}"));
+
+        assertThat(errorLatch.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(errorMessage.get()).contains("\"type\":\"ERROR\"");
+        assertThat(errorMessage.get()).contains("\"code\":\"NOT_HOST\"");
+    }
 }

@@ -64,6 +64,11 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             }
         } else if (message.getPayload().contains("\"type\":\"START_GAME\"")) {
             String lobbyCode = lobbyService.getLobbyCodeForSession(session);
+            if (!lobbyService.isHost(lobbyCode, session)) {
+                session.sendMessage(new TextMessage(
+                        "{\"type\":\"ERROR\",\"data\":{\"code\":\"NOT_HOST\",\"message\":\"Nur der Host darf das Spiel starten\"}}"));
+                return;
+            }
             lobbyService.startGame(lobbyCode);
             String response = "{\"type\":\"GAME_STARTING\",\"data\":{}}";
             for (WebSocketSession s : lobbyService.getSessions(lobbyCode)) {
