@@ -70,8 +70,15 @@ public class LobbyService {
         if (lobby == null) {
             throw new LobbyException("LOBBY_NOT_FOUND", "Lobby existiert nicht");
         }
+        if (lobby.players().size() < 2) {
+            throw new LobbyException("NOT_ENOUGH_PLAYERS", "Mindestens 2 Spieler werden benötigt");
+        }
         if (!hostId.equals(lobby.hostId())) {
             throw new LobbyException("NOT_HOST", "Nur der Host darf das Spiel starten");
+        }
+        boolean allReady = lobby.players().stream().allMatch(p -> p.ready());
+        if (!allReady) {
+            throw new LobbyException("NOT_ALL_READY", "Nicht alle Spieler sind bereit");
         }
     }
 

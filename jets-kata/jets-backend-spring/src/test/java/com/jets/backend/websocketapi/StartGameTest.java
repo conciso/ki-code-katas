@@ -133,6 +133,25 @@ class StartGameTest {
     }
 
 
+    @Test
+    void shouldReturnErrorWhenOnlyOnePlayerInLobby() throws Exception {
+        var aliceMessages = new ArrayBlockingQueue<String>(20);
+
+        WebSocketSession aliceSession = connect("Alice", aliceMessages);
+        receiveConnected(aliceMessages);
+        createLobby(aliceSession, aliceMessages);
+
+        // Alice ist alleine in der Lobby und bereit
+        sendPlayerReady(aliceSession, true);
+        receiveLobbyState(aliceMessages);
+
+        // Host versucht zu starten, obwohl nur 1 Spieler in der Lobby
+        sendStartGame(aliceSession);
+
+        JsonNode error = receiveError(aliceMessages);
+        assertThat(error.get("code").stringValue()).isEqualTo("NOT_ENOUGH_PLAYERS");
+    }
+
     // -------------------------------------------------------------------------
     // Hilfsmethoden
     // -------------------------------------------------------------------------
