@@ -17,6 +17,8 @@ app.UseWebSockets();
 app.UseAuthorization();
 app.MapControllers();
 
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
+
 app.Map("/ws/game", async context =>
 {
     if (!context.WebSockets.IsWebSocketRequest)

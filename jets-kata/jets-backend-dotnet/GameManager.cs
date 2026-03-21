@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace jets_backend_dotnet;
 
@@ -9,16 +10,24 @@ public class GameManager
 {
     private const int ServerTickRate = 30;
 
+    private readonly ILogger<GameManager> _logger;
     private readonly ConcurrentDictionary<string, Player> _players = new();
     private readonly ConcurrentDictionary<string, Lobby> _lobbies = new();
     private readonly ConcurrentDictionary<string, string> _playerLobby = new(); // playerId -> lobbyCode
     private readonly ConcurrentDictionary<string, GameSession> _lobbySessions = new(); // lobbyCode -> GameSession
+
+    public GameManager(ILogger<GameManager> logger)
+    {
+        _logger = logger;
+    }
 
     public async Task HandleConnectionAsync(WebSocket socket, string playerName)
     {
         var playerId = GeneratePlayerId();
         var player = new Player(playerId, playerName, socket);
         _players[playerId] = player;
+
+        _logger.LogInformation("Player connected: {PlayerName} ({PlayerId}), total: {Count}", playerName, playerId, _players.Count);
 
         await SendAsync(socket, new
         {
@@ -33,6 +42,7 @@ public class GameManager
         finally
         {
             _players.TryRemove(playerId, out _);
+            _logger.LogInformation("Player disconnected: {PlayerName} ({PlayerId}), total: {Count}", playerName, playerId, _players.Count);
             await BroadcastAsync(new
             {
                 type = "DISCONNECTED",
@@ -101,16 +111,19 @@ public class GameManager
                     break;
 
                 default:
+                    _logger.LogWarning("Unknown message type '{Type}' from {PlayerId}", type, player.Id);
                     await SendAsync(player.Socket, ErrorResponse("INVALID_MESSAGE", $"Unknown message type: {type}"));
                     break;
             }
         }
         catch (JsonException)
         {
+            _logger.LogWarning("Invalid JSON from {PlayerId}: {Message}", player.Id, message);
             await SendAsync(player.Socket, ErrorResponse("INVALID_MESSAGE", "Message is not valid JSON"));
         }
         catch (KeyNotFoundException)
         {
+            _logger.LogWarning("Missing fields in message from {PlayerId}: {Message}", player.Id, message);
             await SendAsync(player.Socket, ErrorResponse("INVALID_MESSAGE", "Message is missing required fields"));
         }
     }
@@ -120,6 +133,8 @@ public class GameManager
         var lobby = new Lobby(player);
         _lobbies[lobby.Code] = lobby;
         _playerLobby[player.Id] = lobby.Code;
+
+        _logger.LogInformation("Lobby created: {LobbyCode} by {PlayerName} ({PlayerId})", lobby.Code, player.Name, player.Id);
 
         await SendAsync(player.Socket, new
         {
@@ -134,24 +149,30 @@ public class GameManager
     {
         if (!_lobbies.TryGetValue(lobbyCode, out var lobby))
         {
+            _logger.LogWarning("Lobby not found: {LobbyCode} (requested by {PlayerId})", lobbyCode, player.Id);
             await SendAsync(player.Socket, ErrorResponse("LOBBY_NOT_FOUND", "Lobby-Code existiert nicht"));
             return;
         }
 
         if (_lobbySessions.ContainsKey(lobbyCode))
         {
+            _logger.LogWarning("Join denied, game in progress: {LobbyCode} (requested by {PlayerId})", lobbyCode, player.Id);
             await SendAsync(player.Socket, ErrorResponse("GAME_IN_PROGRESS", "Spiel hat bereits begonnen"));
             return;
         }
 
         if (lobby.IsFull)
         {
+            _logger.LogWarning("Join denied, lobby full: {LobbyCode} (requested by {PlayerId})", lobbyCode, player.Id);
             await SendAsync(player.Socket, ErrorResponse("LOBBY_FULL", "Die Lobby ist voll (max. 4 Spieler)"));
             return;
         }
 
         lobby.AddPlayer(player);
         _playerLobby[player.Id] = lobbyCode;
+
+        _logger.LogInformation("Player {PlayerName} ({PlayerId}) joined lobby {LobbyCode}, players: {Count}", player.Name, player.Id, lobbyCode, lobby.Players.Count);
+
         await SendLobbyState(lobby);
     }
 
@@ -163,8 +184,13 @@ public class GameManager
         lobby.RemovePlayer(player.Id);
         _playerLobby.TryRemove(player.Id, out _);
 
+        _logger.LogInformation("Player {PlayerName} ({PlayerId}) left lobby {LobbyCode}, players: {Count}", player.Name, player.Id, lobby.Code, lobby.Players.Count);
+
         if (lobby.Players.Count == 0)
+        {
             _lobbies.TryRemove(lobby.Code, out _);
+            _logger.LogInformation("Lobby {LobbyCode} removed (empty)", lobby.Code);
+        }
         else
             await SendLobbyState(lobby);
     }
@@ -189,6 +215,7 @@ public class GameManager
 
         if (lobby.HostId != player.Id)
         {
+            _logger.LogWarning("Start denied, not host: {PlayerId} in lobby {LobbyCode}", player.Id, lobby.Code);
             await SendAsync(player.Socket, ErrorResponse("NOT_HOST", "Nur der Host darf das Spiel starten"));
             return;
         }
@@ -204,6 +231,8 @@ public class GameManager
             await SendAsync(player.Socket, ErrorResponse("INVALID_MESSAGE", "Nicht alle Spieler sind bereit"));
             return;
         }
+
+        _logger.LogInformation("Game starting in lobby {LobbyCode} with {Count} players", lobby.Code, lobby.Players.Count);
 
         var gameStarting = new
         {
@@ -254,6 +283,7 @@ public class GameManager
 
     private async Task RunGameLoop(GameSession session, Lobby lobby)
     {
+        _logger.LogInformation("Game loop started for lobby {LobbyCode}", lobby.Code);
         var tickInterval = TimeSpan.FromMilliseconds(1000.0 / ServerTickRate);
 
         while (session.IsRunning)
@@ -262,6 +292,8 @@ public class GameManager
             await BroadcastGameState(session, lobby);
             await Task.Delay(tickInterval);
         }
+
+        _logger.LogInformation("Game over in lobby {LobbyCode}: {Reason} after {Ticks} ticks", lobby.Code, session.GameOverReason, session.TickCount);
 
         await BroadcastGameOver(session, lobby);
         _lobbySessions.TryRemove(lobby.Code, out _);
