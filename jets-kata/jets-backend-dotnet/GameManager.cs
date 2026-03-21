@@ -56,6 +56,28 @@ public class GameManager
         {
             _players.TryRemove(playerId, out _);
             _logger.LogInformation("Player disconnected: {PlayerName} ({PlayerId}), total: {Count}", playerName, playerId, _players.Count);
+
+            // Lobby cleanup
+            if (_playerLobby.TryRemove(playerId, out var lobbyCode) && _lobbies.TryGetValue(lobbyCode, out var lobby))
+            {
+                lobby.RemovePlayer(playerId);
+
+                if (_lobbySessions.TryGetValue(lobbyCode, out var session))
+                    session.RemovePlayer(playerId);
+
+                if (lobby.Players.Count == 0)
+                {
+                    _lobbies.TryRemove(lobbyCode, out _);
+                    if (_lobbySessions.TryRemove(lobbyCode, out var s))
+                        s.Stop();
+                    _logger.LogInformation("Lobby {LobbyCode} removed (empty after disconnect)", lobbyCode);
+                }
+                else
+                {
+                    await SendLobbyState(lobby);
+                }
+            }
+
             await BroadcastAsync(new
             {
                 type = "DISCONNECTED",

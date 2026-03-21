@@ -154,4 +154,60 @@ public class DashboardTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("text/html", response.Content.Headers.ContentType?.MediaType);
     }
+
+    // --- Disconnect Cleanup ---
+
+    [Fact]
+    public async Task Disconnect_RemovesPlayerFromLobby()
+    {
+        using var ws1 = await ConnectAsync("Alice");
+        await ReceiveAsync(ws1);
+        await SendAsync(ws1, new { type = "CREATE_LOBBY", data = new { playerName = "Alice" } });
+        var created = JsonDocument.Parse(await ReceiveAsync(ws1));
+        var lobbyCode = created.RootElement.GetProperty("data").GetProperty("lobbyCode").GetString()!;
+        await ReceiveAsync(ws1); // LOBBY_STATE
+
+        var ws2 = await ConnectAsync("Bob");
+        await ReceiveAsync(ws2);
+        await SendAsync(ws2, new { type = "JOIN_LOBBY", data = new { lobbyCode, playerName = "Bob" } });
+        await ReceiveAsync(ws2); // LOBBY_STATE
+        await ReceiveAsync(ws1); // LOBBY_STATE
+
+        // Bob disconnectet
+        ws2.Abort();
+        await Task.Delay(200); // warten bis Disconnect verarbeitet
+
+        var client = _factory.CreateClient();
+        var response = await client.GetAsync("/api/lobbies");
+        var json = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(json);
+
+        var lobby = doc.RootElement.EnumerateArray()
+            .First(l => l.GetProperty("code").GetString() == lobbyCode);
+        Assert.Equal(1, lobby.GetProperty("playerCount").GetInt32());
+    }
+
+    [Fact]
+    public async Task Disconnect_LastPlayerRemovesLobby()
+    {
+        var ws = await ConnectAsync("Alice");
+        await ReceiveAsync(ws);
+        await SendAsync(ws, new { type = "CREATE_LOBBY", data = new { playerName = "Alice" } });
+        var created = JsonDocument.Parse(await ReceiveAsync(ws));
+        var lobbyCode = created.RootElement.GetProperty("data").GetProperty("lobbyCode").GetString()!;
+        await ReceiveAsync(ws); // LOBBY_STATE
+
+        // Alice disconnectet
+        ws.Abort();
+        await Task.Delay(200);
+
+        var client = _factory.CreateClient();
+        var response = await client.GetAsync("/api/lobbies");
+        var json = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(json);
+
+        var lobbyExists = doc.RootElement.EnumerateArray()
+            .Any(l => l.GetProperty("code").GetString() == lobbyCode);
+        Assert.False(lobbyExists, "Lobby should be removed when last player disconnects");
+    }
 }
