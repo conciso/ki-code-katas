@@ -1,8 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import LobbyCreate from '@/components/LobbyCreate.vue'
-import LobbyJoin from '@/components/LobbyJoin.vue'
-import LobbyView from '@/components/LobbyView.vue'
-import GameView from '@/components/GameView.vue'
+import LobbyCreate from '@/components/organisms/LobbyCreate.vue'
+import LobbyJoin from '@/components/organisms/LobbyJoin.vue'
+import LobbyView from '@/components/organisms/LobbyView.vue'
+import GameView from '@/components/templates/GameView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),

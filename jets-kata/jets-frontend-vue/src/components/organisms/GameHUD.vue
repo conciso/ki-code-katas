@@ -13,11 +13,9 @@
         class="hud-player"
         :class="{ 'hud-player--own': p.id === store.playerId }"
       >
-        <span class="hud-dot" :style="{ background: colorOf(p.id) }" />
+        <PlayerColorDot :color="colorOf(p.id)" />
         <span class="hud-name">{{ nameOf(p.id) }}</span>
-        <span data-testid="hud-hp" class="hud-hp">
-          <span v-for="i in p.hp" :key="i" class="hud-heart">♥</span>
-        </span>
+        <HpHearts data-testid="hud-hp" :hp="p.hp" />
         <span data-testid="hud-score" class="hud-score">{{ p.score }}</span>
         <span v-if="!p.alive && p.respawnIn > 0" data-testid="hud-respawn" class="hud-respawn">
           ↺{{ p.respawnIn }}
@@ -31,6 +29,8 @@
 
 <script setup lang="ts">
 import { useGameStore } from '@/stores/useGameStore'
+import PlayerColorDot from '../atoms/PlayerColorDot.vue'
+import HpHearts from '../atoms/HpHearts.vue'
 
 const store = useGameStore()
 
@@ -100,25 +100,12 @@ function nameOf(id: string) {
   background: rgba(79, 195, 247, 0.1);
 }
 
-.hud-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
 .hud-name {
   flex: 1;
   font-size: 0.75rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.hud-hp {
-  color: #ff6b6b;
-  letter-spacing: -0.1em;
-  font-size: 0.65rem;
 }
 
 .hud-score {

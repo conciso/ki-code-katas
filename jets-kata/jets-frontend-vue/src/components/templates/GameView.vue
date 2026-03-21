@@ -10,8 +10,8 @@
 import { useRouter } from 'vue-router'
 import { useKeyboardInput } from '@/composables/useKeyboardInput'
 import { useGameStore } from '@/stores/useGameStore'
-import GameCanvas from './GameCanvas.vue'
-import GameHUD from './GameHUD.vue'
+import GameCanvas from '../organisms/GameCanvas.vue'
+import GameHUD from '../organisms/GameHUD.vue'
 
 const store = useGameStore()
 const router = useRouter()

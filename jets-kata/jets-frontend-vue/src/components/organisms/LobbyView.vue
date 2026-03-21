@@ -14,11 +14,7 @@
         class="player-item"
         data-testid="player-item"
       >
-        <span
-          class="player-color"
-          data-testid="player-color"
-          :style="{ background: player.color }"
-        />
+        <PlayerColorDot data-testid="player-color" :color="player.color" />
         <span class="player-name">{{ player.name }}</span>
         <span class="player-status" :class="{ ready: player.ready }">
           {{ player.ready ? 'Bereit' : 'Warten' }}
@@ -60,7 +56,8 @@
 import { computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGameStore } from '@/stores/useGameStore'
-import BaseButton from './BaseButton.vue'
+import BaseButton from '../atoms/BaseButton.vue'
+import PlayerColorDot from '../atoms/PlayerColorDot.vue'
 
 const store = useGameStore()
 const router = useRouter()
@@ -146,13 +143,6 @@ function toggleReady() {
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--color-border);
   border-radius: 6px;
-}
-
-.player-color {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
 }
 
 .player-name {
