@@ -1,5 +1,7 @@
 package com.jets.backend.websocketapi;
 
+import tools.jackson.databind.JsonNode;
+
 record WsMessage<T>(MessageType type, T data) {
 
     static WsMessage<ConnectedData> connected(ConnectedData data) {
@@ -16,5 +18,9 @@ record WsMessage<T>(MessageType type, T data) {
 
     static WsMessage<ErrorData> error(ErrorData data) {
         return new WsMessage<>(MessageType.ERROR, data);
+    }
+
+    static WsMessage<JsonNode> pong(JsonNode data) {
+        return new WsMessage<>(MessageType.PONG, data);
     }
 }

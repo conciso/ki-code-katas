@@ -7,6 +7,8 @@ enum MessageType {
     CREATE_LOBBY,
     JOIN_LOBBY,
     PLAYER_READY,
-    ERROR
+    ERROR,
+    PING,
+    PONG
 }
 

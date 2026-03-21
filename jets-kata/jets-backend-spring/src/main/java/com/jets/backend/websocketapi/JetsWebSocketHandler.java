@@ -50,6 +50,8 @@ public class JetsWebSocketHandler extends TextWebSocketHandler {
             handleJoinLobby(session, msg.data().get("lobbyCode").stringValue());
         } else if (MessageType.PLAYER_READY.equals(msg.type())) {
             handlePlayerReady(session, msg.data().get("ready").booleanValue());
+        } else if (MessageType.PING.equals(msg.type())) {
+            handlePing(session, msg.data());
         }
     }
 
@@ -117,5 +119,9 @@ public class JetsWebSocketHandler extends TextWebSocketHandler {
             if (kv.length == 2 && kv[0].equals(param)) return kv[1];
         }
         return "";
+    }
+
+    private void handlePing(WebSocketSession session, tools.jackson.databind.JsonNode data) throws Exception {
+        send(session, WsMessage.pong(data));
     }
 }
