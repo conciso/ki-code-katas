@@ -1,0 +1,54 @@
+<div class="game-over-screen">
+  <div class="game-over-card">
+    <h1 class="title">GAME OVER</h1>
+    <p class="reason">{{ reasonText }}</p>
+
+    @if (gameService.gameOver(); as data) {
+      @if (data.wavesCompleted > 0) {
+        <div class="stat-row">
+          <span class="stat-label">Wellen abgeschlossen</span>
+          <span class="stat-value">{{ data.wavesCompleted }}</span>
+        </div>
+      }
+
+      @if (data.totalScore > 0) {
+        <div class="stat-row">
+          <span class="stat-label">Gesamt-Score</span>
+          <span class="stat-value accent">{{ data.totalScore }}</span>
+        </div>
+      }
+
+      <div class="scores-table">
+        <div class="scores-header">
+          <span>Spieler</span>
+          <span>Score</span>
+          <span>Abschüsse</span>
+        </div>
+        @for (score of data.finalScores; track score.playerId; let i = $index) {
+          <div class="score-row" [class.first]="i === 0">
+            <span class="player-name">
+              @if (i === 0) {
+                <span class="medal">1.</span>
+              } @else {
+                <span class="rank">{{ i + 1 }}.</span>
+              }
+              {{ score.name }}
+            </span>
+            <span class="score-val">{{ score.score }}</span>
+            <span class="kills-val">{{ score.kills }}</span>
+          </div>
+        }
+      </div>
+    }
+
+    <div class="actions">
+      @if (lobby.isHost()) {
+        <button class="btn-primary" (click)="returnToLobby()">
+          Zurück zur Lobby
+        </button>
+      } @else {
+        <p class="waiting-msg">Warte auf den Host...</p>
+      }
+    </div>
+  </div>
+</div>

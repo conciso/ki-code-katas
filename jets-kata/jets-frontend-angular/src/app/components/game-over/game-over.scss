@@ -1,0 +1,150 @@
+.game-over-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 2rem;
+}
+
+.game-over-card {
+  background: #111827;
+  border: 1px solid #3a1a1a;
+  border-radius: 8px;
+  padding: 2.5rem 2rem;
+  width: 100%;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+
+  .title {
+    font-size: 3rem;
+    font-weight: 900;
+    letter-spacing: 0.2em;
+    color: #ff4444;
+    text-align: center;
+    text-shadow: 0 0 30px rgba(255, 68, 68, 0.4);
+  }
+
+  .reason {
+    color: #667;
+    font-size: 0.9rem;
+    letter-spacing: 0.08em;
+    text-align: center;
+  }
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #0d1117;
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+
+  .stat-label {
+    color: #667;
+    font-size: 0.8rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .stat-value {
+    color: #ccd;
+    font-size: 1.1rem;
+    font-weight: 700;
+
+    &.accent {
+      color: #ffcc44;
+    }
+  }
+}
+
+.scores-table {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  border-top: 1px solid #1e3a5f;
+  padding-top: 1rem;
+
+  .scores-header {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 1rem;
+    color: #445;
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    padding: 0 0.75rem;
+    text-transform: uppercase;
+
+    span:not(:first-child) {
+      text-align: right;
+      min-width: 70px;
+    }
+  }
+}
+
+.score-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 1rem;
+  align-items: center;
+  background: #0d1117;
+  border: 1px solid #1a2a3a;
+  border-radius: 4px;
+  padding: 0.6rem 0.75rem;
+  transition: border-color 0.15s;
+
+  &.first {
+    border-color: #5a4a00;
+    background: #141008;
+
+    .score-val {
+      color: #ffcc44;
+    }
+  }
+
+  .player-name {
+    color: #ccd;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.95rem;
+  }
+
+  .medal {
+    color: #ffcc44;
+    font-weight: 700;
+  }
+
+  .rank {
+    color: #445;
+  }
+
+  .score-val {
+    color: #aabb88;
+    font-size: 1rem;
+    font-weight: 700;
+    text-align: right;
+    min-width: 70px;
+  }
+
+  .kills-val {
+    color: #667;
+    font-size: 0.85rem;
+    text-align: right;
+    min-width: 70px;
+  }
+}
+
+.actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.5rem;
+}
+
+.waiting-msg {
+  color: #445;
+  font-size: 0.85rem;
+  letter-spacing: 0.1em;
+}

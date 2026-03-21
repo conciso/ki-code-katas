@@ -1,0 +1,116 @@
+<div class="lobby-screen">
+  <div class="lobby-header">
+    <span class="logo-small">JETS</span>
+    <span class="player-badge">
+      {{ lobby.playerName() || lobby.playerId() }}
+    </span>
+  </div>
+
+  @if (view() === 'menu') {
+    <div class="menu-card">
+      <h2>Lobby</h2>
+
+      <button class="btn-primary" (click)="createLobby()">
+        Neue Lobby erstellen
+      </button>
+
+      <div class="divider">oder</div>
+
+      <div class="join-row">
+        <input
+          type="text"
+          [ngModel]="joinCode()"
+          (ngModelChange)="joinCode.set($event)"
+          placeholder="Lobby-Code (z.B. A3F9K2)"
+          maxlength="6"
+          (keyup.enter)="joinLobby()"
+          autocomplete="off"
+          class="code-input"
+        />
+        <button class="btn-secondary" (click)="joinLobby()" [disabled]="!joinCode().trim()">
+          Beitreten
+        </button>
+      </div>
+
+      @if (lobby.error()) {
+        <div class="error-msg">{{ lobby.error()!.message }}</div>
+      }
+    </div>
+  }
+
+  @if (view() === 'lobby' && lobby.lobbyState(); as state) {
+    <div class="lobby-card">
+      <div class="lobby-code-row">
+        <span class="lobby-code-label">Lobby-Code</span>
+        <span class="lobby-code">{{ state.lobbyCode }}</span>
+      </div>
+
+      @if (lobby.isHost()) {
+        <div class="mode-selector">
+          <span class="mode-label">Spielmodus</span>
+          <div class="mode-buttons">
+            <button
+              [class.active]="state.gameMode === 'COOP'"
+              (click)="setGameMode('COOP')"
+            >Co-Op</button>
+            <button
+              [class.active]="state.gameMode === 'FFA'"
+              (click)="setGameMode('FFA')"
+            >Free-for-All</button>
+          </div>
+        </div>
+      } @else {
+        <div class="mode-display">
+          Modus: <strong>{{ state.gameMode === 'COOP' ? 'Co-Op' : 'Free-for-All' }}</strong>
+        </div>
+      }
+
+      <div class="players-list">
+        <div class="players-header">
+          Spieler ({{ state.players.length }} / 4)
+        </div>
+        @for (player of state.players; track player.id) {
+          <div class="player-row" [class.is-me]="player.id === lobby.playerId()">
+            <span class="player-dot" [style.background]="player.color"></span>
+            <span class="player-name">
+              {{ player.name }}
+              @if (player.id === state.hostId) {
+                <span class="host-badge">Host</span>
+              }
+            </span>
+            <span class="ready-indicator" [class.ready]="player.ready">
+              {{ player.ready ? 'Bereit' : 'Wartet...' }}
+            </span>
+          </div>
+        }
+      </div>
+
+      @if (lobby.error()) {
+        <div class="error-msg">{{ lobby.error()!.message }}</div>
+      }
+
+      <div class="lobby-actions">
+        <button class="btn-secondary small" (click)="leave()">Verlassen</button>
+
+        <button
+          class="btn-ready"
+          [class.is-ready]="lobby.myPlayer()?.ready"
+          (click)="toggleReady()"
+        >
+          {{ lobby.myPlayer()?.ready ? 'Nicht bereit' : 'Bereit!' }}
+        </button>
+
+        @if (lobby.isHost()) {
+          <button
+            class="btn-primary"
+            (click)="startGame()"
+            [disabled]="!allReady"
+            [title]="!allReady ? 'Alle Spieler müssen bereit sein (min. 2)' : ''"
+          >
+            Spiel starten
+          </button>
+        }
+      </div>
+    </div>
+  }
+</div>

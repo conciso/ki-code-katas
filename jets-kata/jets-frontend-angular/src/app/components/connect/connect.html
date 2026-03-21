@@ -1,0 +1,63 @@
+<div class="connect-screen">
+  <div class="logo">
+    <span class="logo-jets">JETS</span>
+    <span class="logo-sub">Multiplayer Arcade</span>
+  </div>
+
+  <div class="connect-card">
+    <h2>Verbinden</h2>
+
+    <div class="form-group">
+      <label for="playerName">Spielername</label>
+      <input
+        id="playerName"
+        type="text"
+        [ngModel]="playerName()"
+        (ngModelChange)="playerName.set($event)"
+        placeholder="Dein Name..."
+        maxlength="16"
+        (keyup.enter)="connect()"
+        autocomplete="off"
+      />
+    </div>
+
+    <div class="form-row">
+      <div class="form-group flex-grow">
+        <label for="host">Server</label>
+        <input
+          id="host"
+          type="text"
+          [ngModel]="host()"
+          (ngModelChange)="host.set($event)"
+          placeholder="localhost"
+        />
+      </div>
+      <div class="form-group port">
+        <label for="port">Port</label>
+        <input
+          id="port"
+          type="number"
+          [ngModel]="port()"
+          (ngModelChange)="port.set(+$event)"
+          placeholder="8080"
+        />
+      </div>
+    </div>
+
+    @if (connectionState() === 'error') {
+      <div class="error-msg">Verbindung fehlgeschlagen. Server erreichbar?</div>
+    }
+
+    <button
+      class="btn-primary"
+      (click)="connect()"
+      [disabled]="!playerName().trim() || connectionState() === 'connecting'"
+    >
+      @if (connectionState() === 'connecting') {
+        Verbinde...
+      } @else {
+        Verbinden
+      }
+    </button>
+  </div>
+</div>

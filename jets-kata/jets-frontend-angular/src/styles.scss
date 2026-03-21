@@ -1,1 +1,73 @@
-/* You can add global styles to this file, and also import other style files */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: #060c14;
+  color: #ccd6e0;
+  font-family: 'Courier New', 'Consolas', monospace;
+  -webkit-font-smoothing: antialiased;
+}
+
+.btn-primary {
+  background: #1a3a5a;
+  border: 1px solid #2a6090;
+  border-radius: 4px;
+  color: #88ccff;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  padding: 0.65rem 1.4rem;
+  text-transform: uppercase;
+  transition: all 0.15s;
+
+  &:hover:not(:disabled) {
+    background: #224a70;
+    border-color: #3a80bb;
+    color: #aaddff;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+  }
+}
+
+.btn-secondary {
+  background: #0d1117;
+  border: 1px solid #2a4060;
+  border-radius: 4px;
+  color: #6688aa;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.9rem;
+  letter-spacing: 0.06em;
+  padding: 0.6rem 1rem;
+  transition: all 0.15s;
+
+  &:hover:not(:disabled) {
+    border-color: #4a7090;
+    color: #88aacc;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+  }
+
+  &.small {
+    font-size: 0.8rem;
+    padding: 0.45rem 0.8rem;
+  }
+}
