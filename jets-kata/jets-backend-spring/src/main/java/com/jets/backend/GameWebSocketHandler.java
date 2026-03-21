@@ -24,100 +24,112 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         lobbyService.registerSession(session);
         String playerId = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
         session.getAttributes().put("playerId", playerId);
-        String playerName = extractPlayerName(session);
-        session.getAttributes().put("playerName", playerName);
-        String message = """
-                {"type":"CONNECTED","data":{"playerId":"%s","serverTickRate":30}}
-                """.formatted(playerId).strip();
-        session.sendMessage(new TextMessage(message));
+        session.getAttributes().put("playerName", extractPlayerName(session));
+        session.sendMessage(new TextMessage(
+                "{\"type\":\"CONNECTED\",\"data\":{\"playerId\":\"%s\",\"serverTickRate\":30}}".formatted(playerId)));
     }
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
         String payload = message.getPayload();
-
         switch (MessageType.from(payload)) {
-            case CREATE_LOBBY -> {
-                String lobbyCode = UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();
-                String hostId = (String) session.getAttributes().get("playerId");
-                String hostName = (String) session.getAttributes().get("playerName");
-                lobbyService.createLobby(lobbyCode, hostId, hostName, session);
-                session.sendMessage(new TextMessage(
-                        "{\"type\":\"LOBBY_CREATED\",\"data\":{\"lobbyCode\":\"%s\",\"hostId\":\"%s\"}}"
-                                .formatted(lobbyCode, hostId)));
-            }
-            case JOIN_LOBBY -> {
-                String lobbyCode = payload.replaceAll(".*\"lobbyCode\":\"([^\"]+)\".*", "$1");
-                if (!lobbyService.lobbyExists(lobbyCode)) {
-                    session.sendMessage(new TextMessage(
-                            "{\"type\":\"ERROR\",\"data\":{\"code\":\"LOBBY_NOT_FOUND\",\"message\":\"Lobby nicht gefunden\"}}"));
-                    return;
-                }
-                if (lobbyService.gameInProgress(lobbyCode)) {
-                    session.sendMessage(new TextMessage(
-                            "{\"type\":\"ERROR\",\"data\":{\"code\":\"GAME_IN_PROGRESS\",\"message\":\"Das Spiel hat bereits begonnen\"}}"));
-                    return;
-                }
-                if (lobbyService.lobbyFull(lobbyCode)) {
-                    session.sendMessage(new TextMessage(
-                            "{\"type\":\"ERROR\",\"data\":{\"code\":\"LOBBY_FULL\",\"message\":\"Die Lobby ist voll (max. 4 Spieler)\"}}"));
-                    return;
-                }
-                String playerId = (String) session.getAttributes().get("playerId");
-                String playerName = (String) session.getAttributes().get("playerName");
-                lobbyService.joinLobby(lobbyCode, playerId, playerName, session);
-                broadcast(lobbyCode);
-            }
-            case LEAVE_LOBBY -> {
-                String lobbyCode = lobbyService.getLobbyCodeForSession(session);
-                if (lobbyCode != null) {
-                    lobbyService.removePlayer(lobbyCode, session);
-                    broadcast(lobbyCode);
-                }
-            }
-            case PLAYER_READY -> {
-                String lobbyCode = lobbyService.getLobbyCodeForSession(session);
-                boolean ready = payload.contains("\"ready\":true");
-                lobbyService.setReady(lobbyCode, session, ready);
-                broadcast(lobbyCode);
-            }
-            case SET_GAME_MODE -> {
-                String lobbyCode = lobbyService.getLobbyCodeForSession(session);
-                String gameMode = payload.replaceAll(".*\"gameMode\":\"([^\"]+)\".*", "$1");
-                lobbyService.setGameMode(lobbyCode, gameMode);
-                broadcast(lobbyCode);
-            }
-            case START_GAME -> {
-                String lobbyCode = lobbyService.getLobbyCodeForSession(session);
-                if (!lobbyService.isHost(lobbyCode, session)) {
-                    session.sendMessage(new TextMessage(
-                            "{\"type\":\"ERROR\",\"data\":{\"code\":\"NOT_HOST\",\"message\":\"Nur der Host darf das Spiel starten\"}}"));
-                    return;
-                }
-                lobbyService.startGame(lobbyCode);
-                List<WebSocketSession> sessions = lobbyService.getSessions(lobbyCode);
-                for (WebSocketSession s : sessions) {
-                    s.sendMessage(new TextMessage("{\"type\":\"GAME_STARTING\",\"data\":{}}"));
-                }
-                gameService.startGame(lobbyCode, lobbyService.getPlayers(lobbyCode), sessions);
-            }
-            case PLAYER_INPUT -> {
-                String lobbyCode = lobbyService.getLobbyCodeForSession(session);
-                String playerId = (String) session.getAttributes().get("playerId");
-                gameService.handleInput(lobbyCode, playerId,
-                        payload.contains("\"up\":true"),
-                        payload.contains("\"down\":true"),
-                        payload.contains("\"left\":true"),
-                        payload.contains("\"right\":true"),
-                        payload.contains("\"shoot\":true"));
-            }
-            case PING -> {
-                long timestamp = Long.parseLong(payload.replaceAll(".*\"timestamp\":(\\d+).*", "$1"));
-                session.sendMessage(new TextMessage(
-                        "{\"type\":\"PONG\",\"data\":{\"timestamp\":%d}}".formatted(timestamp)));
-            }
-            default -> { }
+            case CREATE_LOBBY  -> handleCreateLobby(session);
+            case JOIN_LOBBY    -> handleJoinLobby(session, payload);
+            case LEAVE_LOBBY   -> handleLeaveLobby(session);
+            case PLAYER_READY  -> handlePlayerReady(session, payload);
+            case SET_GAME_MODE -> handleSetGameMode(session, payload);
+            case START_GAME    -> handleStartGame(session);
+            case PLAYER_INPUT  -> handlePlayerInput(session, payload);
+            case PING          -> handlePing(session, payload);
+            default            -> { }
         }
+    }
+
+    private void handleCreateLobby(WebSocketSession session) throws Exception {
+        String lobbyCode = UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();
+        String hostId = (String) session.getAttributes().get("playerId");
+        String hostName = (String) session.getAttributes().get("playerName");
+        lobbyService.createLobby(lobbyCode, hostId, hostName, session);
+        session.sendMessage(new TextMessage(
+                "{\"type\":\"LOBBY_CREATED\",\"data\":{\"lobbyCode\":\"%s\",\"hostId\":\"%s\"}}"
+                        .formatted(lobbyCode, hostId)));
+    }
+
+    private void handleJoinLobby(WebSocketSession session, String payload) throws Exception {
+        String lobbyCode = payload.replaceAll(".*\"lobbyCode\":\"([^\"]+)\".*", "$1");
+        if (!lobbyService.lobbyExists(lobbyCode)) {
+            sendError(session, "LOBBY_NOT_FOUND", "Lobby nicht gefunden");
+            return;
+        }
+        if (lobbyService.gameInProgress(lobbyCode)) {
+            sendError(session, "GAME_IN_PROGRESS", "Das Spiel hat bereits begonnen");
+            return;
+        }
+        if (lobbyService.lobbyFull(lobbyCode)) {
+            sendError(session, "LOBBY_FULL", "Die Lobby ist voll (max. 4 Spieler)");
+            return;
+        }
+        String playerId = (String) session.getAttributes().get("playerId");
+        String playerName = (String) session.getAttributes().get("playerName");
+        lobbyService.joinLobby(lobbyCode, playerId, playerName, session);
+        broadcast(lobbyCode);
+    }
+
+    private void handleLeaveLobby(WebSocketSession session) throws Exception {
+        String lobbyCode = lobbyService.getLobbyCodeForSession(session);
+        if (lobbyCode != null) {
+            lobbyService.removePlayer(lobbyCode, session);
+            broadcast(lobbyCode);
+        }
+    }
+
+    private void handlePlayerReady(WebSocketSession session, String payload) throws Exception {
+        String lobbyCode = lobbyService.getLobbyCodeForSession(session);
+        lobbyService.setReady(lobbyCode, session, payload.contains("\"ready\":true"));
+        broadcast(lobbyCode);
+    }
+
+    private void handleSetGameMode(WebSocketSession session, String payload) throws Exception {
+        String lobbyCode = lobbyService.getLobbyCodeForSession(session);
+        String gameMode = payload.replaceAll(".*\"gameMode\":\"([^\"]+)\".*", "$1");
+        lobbyService.setGameMode(lobbyCode, gameMode);
+        broadcast(lobbyCode);
+    }
+
+    private void handleStartGame(WebSocketSession session) throws Exception {
+        String lobbyCode = lobbyService.getLobbyCodeForSession(session);
+        if (!lobbyService.isHost(lobbyCode, session)) {
+            sendError(session, "NOT_HOST", "Nur der Host darf das Spiel starten");
+            return;
+        }
+        lobbyService.startGame(lobbyCode);
+        List<WebSocketSession> sessions = lobbyService.getSessions(lobbyCode);
+        for (WebSocketSession s : sessions) {
+            s.sendMessage(new TextMessage("{\"type\":\"GAME_STARTING\",\"data\":{}}"));
+        }
+        gameService.startGame(lobbyCode, lobbyService.getPlayers(lobbyCode), sessions);
+    }
+
+    private void handlePlayerInput(WebSocketSession session, String payload) {
+        String lobbyCode = lobbyService.getLobbyCodeForSession(session);
+        String playerId = (String) session.getAttributes().get("playerId");
+        gameService.handleInput(lobbyCode, playerId,
+                payload.contains("\"up\":true"),
+                payload.contains("\"down\":true"),
+                payload.contains("\"left\":true"),
+                payload.contains("\"right\":true"),
+                payload.contains("\"shoot\":true"));
+    }
+
+    private void handlePing(WebSocketSession session, String payload) throws Exception {
+        long timestamp = Long.parseLong(payload.replaceAll(".*\"timestamp\":(\\d+).*", "$1"));
+        session.sendMessage(new TextMessage(
+                "{\"type\":\"PONG\",\"data\":{\"timestamp\":%d}}".formatted(timestamp)));
+    }
+
+    private void sendError(WebSocketSession session, String code, String message) throws Exception {
+        session.sendMessage(new TextMessage(
+                "{\"type\":\"ERROR\",\"data\":{\"code\":\"%s\",\"message\":\"%s\"}}".formatted(code, message)));
     }
 
     private void broadcast(String lobbyCode) throws Exception {
