@@ -18,12 +18,29 @@ export const useGameStore = defineStore('game', () => {
   let socket: WebSocket | null = null
   let pingSentAt: number | null = null
   let inputSeq = 0
+  const sendQueue: string[] = []
+
+  function send(msg: object) {
+    const data = JSON.stringify(msg)
+    if (socket?.readyState === WebSocket.OPEN) {
+      socket.send(data)
+    } else {
+      sendQueue.push(data)
+    }
+  }
 
   function connect(name: string) {
     playerName.value = name
     const host = import.meta.env['VITE_WS_HOST'] ?? 'localhost'
     const port = import.meta.env['VITE_WS_PORT'] ?? '8080'
     socket = new WebSocket(`ws://${host}:${port}/ws/game?playerName=${name}`)
+
+    socket.onopen = () => {
+      let queued: string | undefined
+      while ((queued = sendQueue.shift()) !== undefined) {
+        socket!.send(queued)
+      }
+    }
 
     socket.onmessage = (event: MessageEvent) => {
       const msg = JSON.parse(event.data)
@@ -60,42 +77,42 @@ export const useGameStore = defineStore('game', () => {
 
   function ping() {
     pingSentAt = Date.now()
-    socket?.send(JSON.stringify({ type: 'PING', data: { timestamp: pingSentAt } }))
+    send({ type: 'PING', data: { timestamp: pingSentAt } })
   }
 
   function createLobby() {
-    socket?.send(JSON.stringify({ type: 'CREATE_LOBBY', data: { playerName: playerName.value } }))
+    send({ type: 'CREATE_LOBBY', data: { playerName: playerName.value } })
   }
 
   function joinLobby(lobbyCode: string) {
-    socket?.send(JSON.stringify({ type: 'JOIN_LOBBY', data: { lobbyCode, playerName: playerName.value } }))
+    send({ type: 'JOIN_LOBBY', data: { lobbyCode, playerName: playerName.value } })
   }
 
   function setGameMode(gameMode: 'COOP' | 'FFA') {
-    socket?.send(JSON.stringify({ type: 'SET_GAME_MODE', data: { gameMode } }))
+    send({ type: 'SET_GAME_MODE', data: { gameMode } })
   }
 
   function setReady(ready: boolean) {
-    socket?.send(JSON.stringify({ type: 'PLAYER_READY', data: { ready } }))
+    send({ type: 'PLAYER_READY', data: { ready } })
   }
 
   function startGame() {
-    socket?.send(JSON.stringify({ type: 'START_GAME', data: {} }))
+    send({ type: 'START_GAME', data: {} })
   }
 
   function leaveLobby() {
-    socket?.send(JSON.stringify({ type: 'LEAVE_LOBBY', data: {} }))
+    send({ type: 'LEAVE_LOBBY', data: {} })
     lobby.value = null
   }
 
   function returnToLobby() {
-    socket?.send(JSON.stringify({ type: 'RETURN_TO_LOBBY', data: {} }))
+    send({ type: 'RETURN_TO_LOBBY', data: {} })
     gameOver.value = null
   }
 
   function sendInput(input: { up: boolean; down: boolean; left: boolean; right: boolean; shoot: boolean }) {
     inputSeq += 1
-    socket?.send(JSON.stringify({ type: 'PLAYER_INPUT', data: { ...input, seq: inputSeq } }))
+    send({ type: 'PLAYER_INPUT', data: { ...input, seq: inputSeq } })
   }
 
   return {

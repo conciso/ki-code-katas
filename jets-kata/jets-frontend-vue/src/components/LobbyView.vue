@@ -48,11 +48,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useGameStore } from '@/stores/useGameStore'
 import BaseButton from './BaseButton.vue'
 
 const store = useGameStore()
+const router = useRouter()
+
+watch(() => store.gameStarting, (gs) => {
+  if (gs) router.push('/game')
+})
 
 const ownPlayer = computed(() =>
   store.lobby?.players.find((p) => p.id === store.playerId),
