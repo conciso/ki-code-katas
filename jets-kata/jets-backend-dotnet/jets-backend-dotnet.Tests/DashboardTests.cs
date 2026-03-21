@@ -37,6 +37,18 @@ public class DashboardTests : IClassFixture<WebApplicationFactory<Program>>
         await ws.SendAsync(bytes, WebSocketMessageType.Text, true, CancellationToken.None);
     }
 
+    private static JsonElement ParseData(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        return doc.RootElement.GetProperty("data").Clone();
+    }
+
+    private static string GetMessageType(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        return doc.RootElement.GetProperty("type").GetString()!;
+    }
+
     [Fact]
     public async Task ApiLobbies_ReturnsOk()
     {
@@ -209,5 +221,131 @@ public class DashboardTests : IClassFixture<WebApplicationFactory<Program>>
         var lobbyExists = doc.RootElement.EnumerateArray()
             .Any(l => l.GetProperty("code").GetString() == lobbyCode);
         Assert.False(lobbyExists, "Lobby should be removed when last player disconnects");
+    }
+
+    [Fact]
+    public async Task Disconnect_RemainingPlayerReceivesLobbyState()
+    {
+        using var ws1 = await ConnectAsync("Alice");
+        await ReceiveAsync(ws1);
+        await SendAsync(ws1, new { type = "CREATE_LOBBY", data = new { playerName = "Alice" } });
+        var created = JsonDocument.Parse(await ReceiveAsync(ws1));
+        var lobbyCode = created.RootElement.GetProperty("data").GetProperty("lobbyCode").GetString()!;
+        await ReceiveAsync(ws1); // LOBBY_STATE
+
+        var ws2 = await ConnectAsync("Bob");
+        await ReceiveAsync(ws2);
+        await SendAsync(ws2, new { type = "JOIN_LOBBY", data = new { lobbyCode, playerName = "Bob" } });
+        await ReceiveAsync(ws2); // LOBBY_STATE
+        await ReceiveAsync(ws1); // LOBBY_STATE
+
+        ws2.Abort();
+
+        // Alice sollte LOBBY_STATE mit nur noch 1 Spieler bekommen
+        var found = false;
+        for (var i = 0; i < 10 && !found; i++)
+        {
+            try
+            {
+                var msg = await ReceiveAsync(ws1, 500);
+                if (GetMessageType(msg) == "LOBBY_STATE")
+                {
+                    var players = ParseData(msg).GetProperty("players");
+                    Assert.Equal(1, players.GetArrayLength());
+                    Assert.Equal("Alice", players[0].GetProperty("name").GetString());
+                    found = true;
+                }
+            }
+            catch (OperationCanceledException) { break; }
+        }
+
+        Assert.True(found, "Should receive LOBBY_STATE after other player disconnects");
+    }
+
+    [Fact]
+    public async Task Disconnect_HostDisconnect_TransfersHost()
+    {
+        var ws1 = await ConnectAsync("Alice");
+        var aliceConnected = ParseData(await ReceiveAsync(ws1));
+        await SendAsync(ws1, new { type = "CREATE_LOBBY", data = new { playerName = "Alice" } });
+        var created = JsonDocument.Parse(await ReceiveAsync(ws1));
+        var lobbyCode = created.RootElement.GetProperty("data").GetProperty("lobbyCode").GetString()!;
+        await ReceiveAsync(ws1); // LOBBY_STATE
+
+        using var ws2 = await ConnectAsync("Bob");
+        var bobConnected = ParseData(await ReceiveAsync(ws2));
+        var bobId = bobConnected.GetProperty("playerId").GetString();
+        await SendAsync(ws2, new { type = "JOIN_LOBBY", data = new { lobbyCode, playerName = "Bob" } });
+        await ReceiveAsync(ws2); // LOBBY_STATE
+        await ReceiveAsync(ws1); // LOBBY_STATE
+
+        // Host (Alice) disconnectet
+        ws1.Abort();
+
+        // Bob sollte LOBBY_STATE mit sich als Host bekommen
+        var found = false;
+        for (var i = 0; i < 10 && !found; i++)
+        {
+            try
+            {
+                var msg = await ReceiveAsync(ws2, 500);
+                if (GetMessageType(msg) == "LOBBY_STATE")
+                {
+                    var data = ParseData(msg);
+                    Assert.Equal(bobId, data.GetProperty("hostId").GetString());
+                    Assert.Equal(1, data.GetProperty("players").GetArrayLength());
+                    found = true;
+                }
+            }
+            catch (OperationCanceledException) { break; }
+        }
+
+        Assert.True(found, "Should receive LOBBY_STATE with new host after host disconnects");
+    }
+
+    [Fact]
+    public async Task Disconnect_DuringGame_StopsGame()
+    {
+        using var ws1 = await ConnectAsync("Alice");
+        await ReceiveAsync(ws1);
+        await SendAsync(ws1, new { type = "CREATE_LOBBY", data = new { playerName = "Alice" } });
+        var created = JsonDocument.Parse(await ReceiveAsync(ws1));
+        var lobbyCode = created.RootElement.GetProperty("data").GetProperty("lobbyCode").GetString()!;
+        await ReceiveAsync(ws1); // LOBBY_STATE
+
+        var ws2 = await ConnectAsync("Bob");
+        await ReceiveAsync(ws2);
+        await SendAsync(ws2, new { type = "JOIN_LOBBY", data = new { lobbyCode, playerName = "Bob" } });
+        await ReceiveAsync(ws2);
+        await ReceiveAsync(ws1);
+
+        await SendAsync(ws1, new { type = "PLAYER_READY", data = new { ready = true } });
+        await ReceiveAsync(ws1);
+        await ReceiveAsync(ws2);
+        await SendAsync(ws2, new { type = "PLAYER_READY", data = new { ready = true } });
+        await ReceiveAsync(ws1);
+        await ReceiveAsync(ws2);
+
+        await SendAsync(ws1, new { type = "START_GAME", data = new { } });
+        await ReceiveAsync(ws1); // GAME_STARTING
+        await ReceiveAsync(ws2); // GAME_STARTING
+        await ReceiveAsync(ws1); // first GAME_STATE
+
+        // Bob disconnectet während Spiel läuft
+        ws2.Abort();
+        await Task.Delay(500);
+
+        // Lobby sollte nicht mehr "in_game" sein
+        var client = _factory.CreateClient();
+        var response = await client.GetAsync("/api/lobbies");
+        var json = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(json);
+
+        var lobby = doc.RootElement.EnumerateArray()
+            .FirstOrDefault(l => l.GetProperty("code").GetString() == lobbyCode);
+
+        // Entweder Lobby ist weg (nur 1 Spieler übrig → ALL_LEFT) oder nicht mehr in_game
+        if (lobby.ValueKind != JsonValueKind.Undefined)
+            Assert.NotEqual("in_game", lobby.GetProperty("status").GetString());
     }
 }
