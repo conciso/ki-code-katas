@@ -411,4 +411,167 @@ class WebSocketConnectionTest {
         assertThat(errorMessage.get()).contains("\"type\":\"ERROR\"");
         assertThat(errorMessage.get()).contains("\"code\":\"NOT_HOST\"");
     }
+
+    @Test
+    void shouldReceiveLobbyStateWithPlayersListAfterJoin() throws Exception {
+        AtomicReference<String> lobbyCode = new AtomicReference<>();
+        CountDownLatch lobbyCreatedLatch = new CountDownLatch(1);
+
+        StandardWebSocketClient client = new StandardWebSocketClient();
+        client.execute(new TextWebSocketHandler() {
+            @Override
+            protected void handleTextMessage(WebSocketSession session, TextMessage message) {
+                if (message.getPayload().contains("\"type\":\"LOBBY_CREATED\"")) {
+                    lobbyCode.set(message.getPayload().replaceAll(".*\"lobbyCode\":\"([^\"]+)\".*", "$1"));
+                    lobbyCreatedLatch.countDown();
+                }
+            }
+        }, "ws://localhost:" + port + "/ws/game?playerName=Alice").get(5, TimeUnit.SECONDS)
+                .sendMessage(new TextMessage("{\"type\":\"CREATE_LOBBY\",\"data\":{}}"));
+
+        assertThat(lobbyCreatedLatch.await(5, TimeUnit.SECONDS)).isTrue();
+
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<String> lobbyStateMessage = new AtomicReference<>();
+
+        WebSocketSession bob = client.execute(new TextWebSocketHandler() {
+            @Override
+            protected void handleTextMessage(WebSocketSession session, TextMessage message) {
+                if (message.getPayload().contains("\"type\":\"LOBBY_STATE\"")) {
+                    lobbyStateMessage.set(message.getPayload());
+                    latch.countDown();
+                }
+            }
+        }, "ws://localhost:" + port + "/ws/game?playerName=Bob").get(5, TimeUnit.SECONDS);
+
+        bob.sendMessage(new TextMessage(
+                "{\"type\":\"JOIN_LOBBY\",\"data\":{\"lobbyCode\":\"" + lobbyCode.get() + "\"}}"));
+
+        assertThat(latch.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(lobbyStateMessage.get()).contains("\"players\"");
+        assertThat(lobbyStateMessage.get()).contains("\"name\":\"Alice\"");
+        assertThat(lobbyStateMessage.get()).contains("\"name\":\"Bob\"");
+    }
+
+    @Test
+    void shouldReceiveUpdatedLobbyStateAfterPlayerReady() throws Exception {
+        AtomicReference<String> lobbyCode = new AtomicReference<>();
+        CountDownLatch lobbyCreatedLatch = new CountDownLatch(1);
+        CountDownLatch joinedLatch = new CountDownLatch(1);
+        CountDownLatch readyLatch = new CountDownLatch(1);
+        AtomicReference<String> readyMessage = new AtomicReference<>();
+
+        StandardWebSocketClient client = new StandardWebSocketClient();
+        WebSocketSession alice = client.execute(new TextWebSocketHandler() {
+            @Override
+            protected void handleTextMessage(WebSocketSession session, TextMessage message) {
+                if (message.getPayload().contains("\"type\":\"LOBBY_CREATED\"")) {
+                    lobbyCode.set(message.getPayload().replaceAll(".*\"lobbyCode\":\"([^\"]+)\".*", "$1"));
+                    lobbyCreatedLatch.countDown();
+                } else if (message.getPayload().contains("\"type\":\"LOBBY_STATE\"")
+                        && message.getPayload().contains("\"ready\":true")) {
+                    readyMessage.set(message.getPayload());
+                    readyLatch.countDown();
+                }
+            }
+        }, "ws://localhost:" + port + "/ws/game?playerName=Alice").get(5, TimeUnit.SECONDS);
+
+        alice.sendMessage(new TextMessage("{\"type\":\"CREATE_LOBBY\",\"data\":{}}"));
+        assertThat(lobbyCreatedLatch.await(5, TimeUnit.SECONDS)).isTrue();
+
+        WebSocketSession bob = client.execute(new TextWebSocketHandler() {
+            @Override
+            protected void handleTextMessage(WebSocketSession session, TextMessage message) {
+                if (message.getPayload().contains("\"type\":\"LOBBY_STATE\"")) {
+                    joinedLatch.countDown();
+                }
+            }
+        }, "ws://localhost:" + port + "/ws/game?playerName=Bob").get(5, TimeUnit.SECONDS);
+
+        bob.sendMessage(new TextMessage(
+                "{\"type\":\"JOIN_LOBBY\",\"data\":{\"lobbyCode\":\"" + lobbyCode.get() + "\"}}"));
+        assertThat(joinedLatch.await(5, TimeUnit.SECONDS)).isTrue();
+
+        alice.sendMessage(new TextMessage("{\"type\":\"PLAYER_READY\",\"data\":{\"ready\":true}}"));
+
+        assertThat(readyLatch.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(readyMessage.get()).contains("\"ready\":true");
+    }
+
+    @Test
+    void shouldReceiveUpdatedLobbyStateAfterSetGameMode() throws Exception {
+        AtomicReference<String> lobbyCode = new AtomicReference<>();
+        CountDownLatch lobbyCreatedLatch = new CountDownLatch(1);
+        CountDownLatch gameModeLatch = new CountDownLatch(1);
+        AtomicReference<String> gameModeMessage = new AtomicReference<>();
+
+        StandardWebSocketClient client = new StandardWebSocketClient();
+        WebSocketSession alice = client.execute(new TextWebSocketHandler() {
+            @Override
+            protected void handleTextMessage(WebSocketSession session, TextMessage message) {
+                if (message.getPayload().contains("\"type\":\"LOBBY_CREATED\"")) {
+                    lobbyCode.set(message.getPayload().replaceAll(".*\"lobbyCode\":\"([^\"]+)\".*", "$1"));
+                    lobbyCreatedLatch.countDown();
+                } else if (message.getPayload().contains("\"type\":\"LOBBY_STATE\"")
+                        && message.getPayload().contains("\"gameMode\"")) {
+                    gameModeMessage.set(message.getPayload());
+                    gameModeLatch.countDown();
+                }
+            }
+        }, "ws://localhost:" + port + "/ws/game?playerName=Alice").get(5, TimeUnit.SECONDS);
+
+        alice.sendMessage(new TextMessage("{\"type\":\"CREATE_LOBBY\",\"data\":{}}"));
+        assertThat(lobbyCreatedLatch.await(5, TimeUnit.SECONDS)).isTrue();
+
+        alice.sendMessage(new TextMessage("{\"type\":\"SET_GAME_MODE\",\"data\":{\"gameMode\":\"FFA\"}}"));
+
+        assertThat(gameModeLatch.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(gameModeMessage.get()).contains("\"gameMode\":\"FFA\"");
+    }
+
+    @Test
+    void shouldReceiveLobbyStateAfterPlayerLeaves() throws Exception {
+        AtomicReference<String> lobbyCode = new AtomicReference<>();
+        CountDownLatch lobbyCreatedLatch = new CountDownLatch(1);
+        CountDownLatch joinedLatch = new CountDownLatch(1);
+        CountDownLatch leftLatch = new CountDownLatch(1);
+        AtomicReference<String> leftMessage = new AtomicReference<>();
+
+        StandardWebSocketClient client = new StandardWebSocketClient();
+        WebSocketSession alice = client.execute(new TextWebSocketHandler() {
+            @Override
+            protected void handleTextMessage(WebSocketSession session, TextMessage message) {
+                if (message.getPayload().contains("\"type\":\"LOBBY_CREATED\"")) {
+                    lobbyCode.set(message.getPayload().replaceAll(".*\"lobbyCode\":\"([^\"]+)\".*", "$1"));
+                    lobbyCreatedLatch.countDown();
+                } else if (message.getPayload().contains("\"type\":\"LOBBY_STATE\"")
+                        && !message.getPayload().contains("\"name\":\"Bob\"")) {
+                    leftMessage.set(message.getPayload());
+                    leftLatch.countDown();
+                }
+            }
+        }, "ws://localhost:" + port + "/ws/game?playerName=Alice").get(5, TimeUnit.SECONDS);
+
+        alice.sendMessage(new TextMessage("{\"type\":\"CREATE_LOBBY\",\"data\":{}}"));
+        assertThat(lobbyCreatedLatch.await(5, TimeUnit.SECONDS)).isTrue();
+
+        WebSocketSession bob = client.execute(new TextWebSocketHandler() {
+            @Override
+            protected void handleTextMessage(WebSocketSession session, TextMessage message) {
+                if (message.getPayload().contains("\"type\":\"LOBBY_STATE\"")) {
+                    joinedLatch.countDown();
+                }
+            }
+        }, "ws://localhost:" + port + "/ws/game?playerName=Bob").get(5, TimeUnit.SECONDS);
+
+        bob.sendMessage(new TextMessage(
+                "{\"type\":\"JOIN_LOBBY\",\"data\":{\"lobbyCode\":\"" + lobbyCode.get() + "\"}}"));
+        assertThat(joinedLatch.await(5, TimeUnit.SECONDS)).isTrue();
+
+        bob.sendMessage(new TextMessage("{\"type\":\"LEAVE_LOBBY\",\"data\":{}}"));
+
+        assertThat(leftLatch.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(leftMessage.get()).contains("\"type\":\"LOBBY_STATE\"");
+        assertThat(leftMessage.get()).doesNotContain("\"name\":\"Bob\"");
+    }
 }
