@@ -176,4 +176,44 @@ class WebSocketConnectionTest {
         assertThat(gameStartingLatch.await(5, TimeUnit.SECONDS)).isTrue();
         assertThat(gameStartingMessage.get()).contains("\"type\":\"GAME_STARTING\"");
     }
+
+    @Test
+    void shouldBroadcastLobbyStateToAllPlayersWhenSomeoneJoins() throws Exception {
+        AtomicReference<String> lobbyCode = new AtomicReference<>();
+        CountDownLatch lobbyCreatedLatch = new CountDownLatch(1);
+        CountDownLatch hostReceivedLobbyState = new CountDownLatch(1);
+
+        StandardWebSocketClient client = new StandardWebSocketClient();
+        WebSocketSession hostSession = client.execute(new TextWebSocketHandler() {
+            @Override
+            protected void handleTextMessage(WebSocketSession session, TextMessage message) {
+                if (message.getPayload().contains("\"type\":\"LOBBY_CREATED\"")) {
+                    lobbyCode.set(message.getPayload().replaceAll(".*\"lobbyCode\":\"([^\"]+)\".*", "$1"));
+                    lobbyCreatedLatch.countDown();
+                } else if (message.getPayload().contains("\"type\":\"LOBBY_STATE\"")) {
+                    hostReceivedLobbyState.countDown();
+                }
+            }
+        }, "ws://localhost:" + port + "/ws/game?playerName=Alice").get(5, TimeUnit.SECONDS);
+
+        hostSession.sendMessage(new TextMessage("{\"type\":\"CREATE_LOBBY\",\"data\":{}}"));
+        assertThat(lobbyCreatedLatch.await(5, TimeUnit.SECONDS)).isTrue();
+
+        // Bob tritt bei
+        CountDownLatch bobReceivedLobbyState = new CountDownLatch(1);
+        WebSocketSession joinerSession = client.execute(new TextWebSocketHandler() {
+            @Override
+            protected void handleTextMessage(WebSocketSession session, TextMessage message) {
+                if (message.getPayload().contains("\"type\":\"LOBBY_STATE\"")) {
+                    bobReceivedLobbyState.countDown();
+                }
+            }
+        }, "ws://localhost:" + port + "/ws/game?playerName=Bob").get(5, TimeUnit.SECONDS);
+
+        joinerSession.sendMessage(new TextMessage(
+                "{\"type\":\"JOIN_LOBBY\",\"data\":{\"lobbyCode\":\"" + lobbyCode.get() + "\"}}"));
+
+        assertThat(bobReceivedLobbyState.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(hostReceivedLobbyState.await(5, TimeUnit.SECONDS)).isTrue();
+    }
 }

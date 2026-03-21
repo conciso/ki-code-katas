@@ -1,7 +1,6 @@
 package com.jets.backend;
 
 import org.springframework.stereotype.Service;
-
 import org.springframework.web.socket.WebSocketSession;
 
 import java.util.List;
@@ -12,20 +11,21 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @Service
 public class LobbyService {
 
-    private final Map<String, String> hostIds = new ConcurrentHashMap<>();             // lobbyCode -> hostId
-    private final Map<String, List<WebSocketSession>> sessions = new ConcurrentHashMap<>(); // lobbyCode -> sessions
+    private final Map<String, WebSocketSession> sessionRegistry = new ConcurrentHashMap<>(); // sessionId -> session
+    private final Map<String, String> hostIds = new ConcurrentHashMap<>();                    // lobbyCode -> hostId
+    private final Map<String, List<String>> lobbySessionIds = new ConcurrentHashMap<>();      // lobbyCode -> sessionIds
+
+    public void registerSession(WebSocketSession session) {
+        sessionRegistry.put(session.getId(), session);
+    }
 
     public void createLobby(String lobbyCode, String hostId, WebSocketSession hostSession) {
         hostIds.put(lobbyCode, hostId);
-        sessions.put(lobbyCode, new CopyOnWriteArrayList<>(List.of(hostSession)));
+        lobbySessionIds.put(lobbyCode, new CopyOnWriteArrayList<>(List.of(hostSession.getId())));
     }
 
     public void joinLobby(String lobbyCode, WebSocketSession session) {
-        sessions.getOrDefault(lobbyCode, List.of()).add(session);
-    }
-
-    public boolean lobbyExists(String lobbyCode) {
-        return hostIds.containsKey(lobbyCode);
+        lobbySessionIds.getOrDefault(lobbyCode, List.of()).add(session.getId());
     }
 
     public String getHostId(String lobbyCode) {
@@ -33,12 +33,15 @@ public class LobbyService {
     }
 
     public List<WebSocketSession> getSessions(String lobbyCode) {
-        return sessions.getOrDefault(lobbyCode, List.of());
+        return lobbySessionIds.getOrDefault(lobbyCode, List.of()).stream()
+                .map(sessionRegistry::get)
+                .filter(s -> s != null && s.isOpen())
+                .toList();
     }
 
     public String getLobbyCodeForSession(WebSocketSession session) {
-        return sessions.entrySet().stream()
-                .filter(e -> e.getValue().stream().anyMatch(s -> s.getId().equals(session.getId())))
+        return lobbySessionIds.entrySet().stream()
+                .filter(e -> e.getValue().contains(session.getId()))
                 .map(Map.Entry::getKey)
                 .findFirst()
                 .orElse(null);

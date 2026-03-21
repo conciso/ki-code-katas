@@ -18,6 +18,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+        lobbyService.registerSession(session);
         String playerId = UUID.randomUUID().toString().replace("-", "").substring(0, 8);
         session.getAttributes().put("playerId", playerId);
         String message = """
@@ -43,7 +44,9 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             String response = """
                     {"type":"LOBBY_STATE","data":{"lobbyCode":"%s","hostId":"%s"}}
                     """.formatted(lobbyCode, hostId).strip();
-            session.sendMessage(new TextMessage(response));
+            for (WebSocketSession s : lobbyService.getSessions(lobbyCode)) {
+                s.sendMessage(new TextMessage(response));
+            }
         } else if (message.getPayload().contains("\"type\":\"START_GAME\"")) {
             String lobbyCode = lobbyService.getLobbyCodeForSession(session);
             String response = "{\"type\":\"GAME_STARTING\",\"data\":{}}";
