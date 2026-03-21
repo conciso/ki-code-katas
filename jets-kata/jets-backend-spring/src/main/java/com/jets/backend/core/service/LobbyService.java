@@ -38,6 +38,12 @@ public class LobbyService {
 
     public void joinLobby(String lobbyCode, PlayerInfo player) {
         Lobby lobby = lobbies.get(lobbyCode);
+        if (lobby == null) {
+            throw new LobbyException("LOBBY_NOT_FOUND", "Lobby " + lobbyCode + " existiert nicht");
+        }
+        if (lobby.players().size() >= PLAYER_COLORS.size()) {
+            throw new LobbyException("LOBBY_FULL", "Die Lobby ist voll (max. " + PLAYER_COLORS.size() + " Spieler)");
+        }
         String color = PLAYER_COLORS.get(lobby.players().size());
 
         lobby.players().add(new LobbyPlayer(player.id(), player.name(), false, color));

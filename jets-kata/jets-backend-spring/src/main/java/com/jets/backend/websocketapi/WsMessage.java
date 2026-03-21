@@ -13,4 +13,8 @@ record WsMessage<T>(MessageType type, T data) {
     static WsMessage<LobbyStateData> lobbyState(LobbyStateData data) {
         return new WsMessage<>(MessageType.LOBBY_STATE, data);
     }
+
+    static WsMessage<ErrorData> error(ErrorData data) {
+        return new WsMessage<>(MessageType.ERROR, data);
+    }
 }

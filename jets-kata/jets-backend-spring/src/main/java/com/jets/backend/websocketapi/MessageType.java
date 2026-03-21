@@ -6,6 +6,7 @@ enum MessageType {
     LOBBY_STATE,
     CREATE_LOBBY,
     JOIN_LOBBY,
-    PLAYER_READY
+    PLAYER_READY,
+    ERROR
 }
 

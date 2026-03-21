@@ -2,6 +2,7 @@ package com.jets.backend.websocketapi;
 
 import com.jets.backend.core.model.Lobby;
 import com.jets.backend.core.model.PlayerInfo;
+import com.jets.backend.core.service.LobbyException;
 import com.jets.backend.core.service.LobbyService;
 import tools.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
@@ -63,7 +64,12 @@ public class JetsWebSocketHandler extends TextWebSocketHandler {
 
     private void handleJoinLobby(WebSocketSession session, String lobbyCode) throws Exception {
         PlayerInfo player = players.get(session.getId());
-        lobbyService.joinLobby(lobbyCode, player);
+        try {
+            lobbyService.joinLobby(lobbyCode, player);
+        } catch (LobbyException e) {
+            send(session, WsMessage.error(new ErrorData(e.getErrorCode(), e.getMessage())));
+            return;
+        }
         playerLobby.put(session.getId(), lobbyCode);
         broadcastLobbyState(lobbyCode);
     }
