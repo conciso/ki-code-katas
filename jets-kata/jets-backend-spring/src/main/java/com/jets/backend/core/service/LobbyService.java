@@ -41,6 +41,9 @@ public class LobbyService {
         if (lobby == null) {
             throw new LobbyException("LOBBY_NOT_FOUND", "Lobby " + lobbyCode + " existiert nicht");
         }
+        if (lobby.started()) {
+            throw new LobbyException("GAME_IN_PROGRESS", "Das Spiel läuft bereits");
+        }
         if (lobby.players().size() >= PLAYER_COLORS.size()) {
             throw new LobbyException("LOBBY_FULL", "Die Lobby ist voll (max. " + PLAYER_COLORS.size() + " Spieler)");
         }
@@ -80,6 +83,7 @@ public class LobbyService {
         if (!allReady) {
             throw new LobbyException("NOT_ALL_READY", "Nicht alle Spieler sind bereit");
         }
+        lobby.start();
     }
 
     private String generateLobbyCode() {
