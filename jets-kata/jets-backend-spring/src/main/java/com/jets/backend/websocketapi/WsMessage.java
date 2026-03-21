@@ -23,4 +23,8 @@ record WsMessage<T>(MessageType type, T data) {
     static WsMessage<JsonNode> pong(JsonNode data) {
         return new WsMessage<>(MessageType.PONG, data);
     }
+
+    static WsMessage<GameStartingData> gameStarting(GameStartingData data) {
+        return new WsMessage<>(MessageType.GAME_STARTING, data);
+    }
 }

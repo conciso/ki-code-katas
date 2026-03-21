@@ -38,6 +38,7 @@ public class JetsWebSocketHandler extends TextWebSocketHandler {
         handlers.put(MessageType.JOIN_LOBBY, (session, data) -> handleJoinLobby(session, data.get("lobbyCode").stringValue()));
         handlers.put(MessageType.PLAYER_READY, (session, data) -> handlePlayerReady(session, data.get("ready").booleanValue()));
         handlers.put(MessageType.PING, this::handlePing);
+        handlers.put(MessageType.START_GAME, (session, data) -> handleStartGame(session));
     }
 
     @Override
@@ -128,5 +129,44 @@ public class JetsWebSocketHandler extends TextWebSocketHandler {
 
     private void handlePing(WebSocketSession session, tools.jackson.databind.JsonNode data) throws Exception {
         send(session, WsMessage.pong(data));
+    }
+
+    private void handleStartGame(WebSocketSession session) throws Exception {
+        PlayerInfo player = players.get(session.getId());
+        String lobbyCode = playerLobby.get(session.getId());
+        
+        try {
+            lobbyService.startGame(lobbyCode, player.id());
+        } catch (LobbyException e) {
+            send(session, WsMessage.error(new ErrorData(e.getErrorCode(), e.getMessage())));
+            return;
+        }
+        
+        broadcastGameStarting(lobbyCode);
+    }
+
+    private void broadcastGameStarting(String lobbyCode) throws Exception {
+        Lobby lobby = lobbyService.getLobby(lobbyCode);
+        
+        List<GameStartingPlayer> players = lobby.players().stream()
+                .map(p -> new GameStartingPlayer(
+                    p.id(),
+                    p.name(),
+                    p.color(),
+                    generateSpawnX(lobby.players().indexOf(p)),
+                    540
+                ))
+                .toList();
+        
+        GameStartingData data = new GameStartingData(3, lobby.gameMode(), 1920, 1080, players);
+        WsMessage<GameStartingData> msg = WsMessage.gameStarting(data);
+        
+        for (WebSocketSession s : lobbyService.getLobbySessionList(lobbyCode)) {
+            if (s.isOpen()) send(s, msg);
+        }
+    }
+
+    private int generateSpawnX(int playerIndex) {
+        return 200 + (playerIndex * 400);
     }
 }

@@ -65,6 +65,13 @@ public class LobbyService {
         return lobbySessions.get(lobbyCode);
     }
 
+    public void startGame(String lobbyCode, String hostId) {
+        Lobby lobby = lobbies.get(lobbyCode);
+        if (lobby == null) {
+            throw new LobbyException("LOBBY_NOT_FOUND", "Lobby existiert nicht");
+        }
+    }
+
     private String generateLobbyCode() {
         String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
         StringBuilder code = new StringBuilder();
