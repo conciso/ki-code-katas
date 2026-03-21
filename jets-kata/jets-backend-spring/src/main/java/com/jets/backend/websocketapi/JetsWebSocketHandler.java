@@ -10,6 +10,7 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -24,10 +25,19 @@ public class JetsWebSocketHandler extends TextWebSocketHandler {
     private final LobbyService lobbyService;
     private final Map<String, PlayerInfo> players = new ConcurrentHashMap<>();
     private final Map<String, String> playerLobby = new ConcurrentHashMap<>();
+    private final Map<MessageType, MessageHandler> handlers = new HashMap<>();
 
     public JetsWebSocketHandler(ObjectMapper objectMapper, LobbyService lobbyService) {
         this.objectMapper = objectMapper;
         this.lobbyService = lobbyService;
+        initializeHandlers();
+    }
+
+    private void initializeHandlers() {
+        handlers.put(MessageType.CREATE_LOBBY, (session, data) -> handleCreateLobby(session));
+        handlers.put(MessageType.JOIN_LOBBY, (session, data) -> handleJoinLobby(session, data.get("lobbyCode").stringValue()));
+        handlers.put(MessageType.PLAYER_READY, (session, data) -> handlePlayerReady(session, data.get("ready").booleanValue()));
+        handlers.put(MessageType.PING, this::handlePing);
     }
 
     @Override
@@ -43,15 +53,10 @@ public class JetsWebSocketHandler extends TextWebSocketHandler {
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
         IncomingMessage msg = objectMapper.readValue(message.getPayload(), IncomingMessage.class);
+        MessageHandler handler = handlers.get(msg.type());
 
-        if (MessageType.CREATE_LOBBY.equals(msg.type())) {
-            handleCreateLobby(session);
-        } else if (MessageType.JOIN_LOBBY.equals(msg.type())) {
-            handleJoinLobby(session, msg.data().get("lobbyCode").stringValue());
-        } else if (MessageType.PLAYER_READY.equals(msg.type())) {
-            handlePlayerReady(session, msg.data().get("ready").booleanValue());
-        } else if (MessageType.PING.equals(msg.type())) {
-            handlePing(session, msg.data());
+        if (handler != null) {
+            handler.handle(session, msg.data());
         }
     }
 
