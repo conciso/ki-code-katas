@@ -80,12 +80,18 @@ public class GameSessionTests
     }
 
     [Fact]
-    public void NewSession_PlayersHaveSpawnPositions()
+    public void NewSession_PlayersSpawnFarApart()
     {
         var session = CreateTwoPlayerSession();
+        var p1 = session.Players[0];
+        var p2 = session.Players[1];
 
-        // Spieler sollten an unterschiedlichen Positionen spawnen
-        Assert.NotEqual(session.Players[0].X, session.Players[1].X);
+        var dx = p1.X - p2.X;
+        var dy = p1.Y - p2.Y;
+        var distance = Math.Sqrt(dx * dx + dy * dy);
+
+        // Spieler sollten mindestens 400 Einheiten auseinander spawnen
+        Assert.True(distance > 400, $"Players spawned too close: {distance:F0} apart");
     }
 
     [Fact]
@@ -120,7 +126,7 @@ public class GameSessionTests
     }
 
     [Fact]
-    public void NewSession_FourPlayersGetDifferentPositions()
+    public void NewSession_FourPlayersSpawnInCorners()
     {
         var players = new List<(string Id, string Name, string Color)>
         {
@@ -133,6 +139,27 @@ public class GameSessionTests
 
         var positions = session.Players.Select(p => (p.X, p.Y)).ToList();
         Assert.Equal(4, positions.Distinct().Count());
+
+        // Alle Spieler sollten weit voneinander entfernt sein
+        for (var i = 0; i < session.Players.Count; i++)
+        {
+            for (var j = i + 1; j < session.Players.Count; j++)
+            {
+                var dx = session.Players[i].X - session.Players[j].X;
+                var dy = session.Players[i].Y - session.Players[j].Y;
+                var dist = Math.Sqrt(dx * dx + dy * dy);
+                Assert.True(dist > 300, $"Players {i} and {j} too close: {dist:F0}");
+            }
+        }
+    }
+
+    [Fact]
+    public void NewSession_PlayersFaceDifferentDirections()
+    {
+        var session = CreateTwoPlayerSession();
+
+        // Spieler sollten nicht alle in die gleiche Richtung schauen
+        Assert.NotEqual(session.Players[0].Angle, session.Players[1].Angle);
     }
 
     // --- Jet-Bewegung ---

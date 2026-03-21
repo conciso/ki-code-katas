@@ -239,13 +239,23 @@ public class GameSession
             .ToList();
     }
 
-    private static double SpawnX(int index, int count)
+    private static readonly (double X, double Y)[] SpawnPositions =
+    [
+        (FieldWidth * 0.2, FieldHeight * 0.2),   // oben links
+        (FieldWidth * 0.8, FieldHeight * 0.8),   // unten rechts
+        (FieldWidth * 0.8, FieldHeight * 0.2),   // oben rechts
+        (FieldWidth * 0.2, FieldHeight * 0.8),   // unten links
+    ];
+
+    private static double SpawnX(int index, int count) => SpawnPositions[index % SpawnPositions.Length].X;
+
+    private static double SpawnY(int index, int count) => SpawnPositions[index % SpawnPositions.Length].Y;
+
+    private static double SpawnAngle(int index, int count)
     {
-        var spacing = FieldWidth / (count + 1);
-        return spacing * (index + 1);
+        // Spieler schaut zur Feldmitte
+        var spawnX = SpawnX(index, count);
+        var spawnY = SpawnY(index, count);
+        return Math.Atan2(FieldHeight / 2 - spawnY, FieldWidth / 2 - spawnX);
     }
-
-    private static double SpawnY(int index, int count) => FieldHeight / 2;
-
-    private static double SpawnAngle(int index, int count) => -Math.PI / 2;
 }
