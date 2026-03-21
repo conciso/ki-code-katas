@@ -22,6 +22,7 @@ public class JetsWebSocketHandler extends TextWebSocketHandler {
     private final ObjectMapper objectMapper;
     private final LobbyService lobbyService;
     private final Map<String, PlayerInfo> players = new ConcurrentHashMap<>();
+    private final Map<String, String> playerLobby = new ConcurrentHashMap<>();
 
     public JetsWebSocketHandler(ObjectMapper objectMapper, LobbyService lobbyService) {
         this.objectMapper = objectMapper;
@@ -46,6 +47,8 @@ public class JetsWebSocketHandler extends TextWebSocketHandler {
             handleCreateLobby(session);
         } else if (MessageType.JOIN_LOBBY.equals(msg.type())) {
             handleJoinLobby(session, msg.data().get("lobbyCode").stringValue());
+        } else if (MessageType.PLAYER_READY.equals(msg.type())) {
+            handlePlayerReady(session, msg.data().get("ready").booleanValue());
         }
     }
 
@@ -53,6 +56,7 @@ public class JetsWebSocketHandler extends TextWebSocketHandler {
         PlayerInfo player = players.get(session.getId());
         Lobby lobby = lobbyService.createLobby(player);
 
+        playerLobby.put(session.getId(), lobby.code());
         send(session, WsMessage.lobbyCreated(new LobbyCreatedData(lobby.code(), lobby.hostId())));
         broadcastLobbyState(lobby.code());
     }
@@ -60,6 +64,14 @@ public class JetsWebSocketHandler extends TextWebSocketHandler {
     private void handleJoinLobby(WebSocketSession session, String lobbyCode) throws Exception {
         PlayerInfo player = players.get(session.getId());
         lobbyService.joinLobby(lobbyCode, player);
+        playerLobby.put(session.getId(), lobbyCode);
+        broadcastLobbyState(lobbyCode);
+    }
+
+    private void handlePlayerReady(WebSocketSession session, boolean ready) throws Exception {
+        PlayerInfo player = players.get(session.getId());
+        String lobbyCode = playerLobby.get(session.getId());
+        lobbyService.setPlayerReady(lobbyCode, player.id(), ready);
         broadcastLobbyState(lobbyCode);
     }
 

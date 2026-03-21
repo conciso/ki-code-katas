@@ -44,6 +44,13 @@ public class LobbyService {
         lobbySessions.get(lobbyCode).add(player.session());
     }
 
+    public void setPlayerReady(String lobbyCode, String playerId, boolean ready) {
+        Lobby lobby = lobbies.get(lobbyCode);
+        lobby.players().replaceAll(p ->
+            p.id().equals(playerId) ? new LobbyPlayer(p.id(), p.name(), ready, p.color()) : p
+        );
+    }
+
     public Lobby getLobby(String lobbyCode) {
         return lobbies.get(lobbyCode);
     }
