@@ -11,8 +11,13 @@ function makeMockCtx() {
     clearRect: vi.fn(),
     fillRect: vi.fn(),
     beginPath: vi.fn(),
+    closePath: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
     arc: vi.fn(),
+    ellipse: vi.fn(),
     fill: vi.fn(),
+    stroke: vi.fn(),
     save: vi.fn(),
     restore: vi.fn(),
     translate: vi.fn(),
@@ -85,7 +90,7 @@ describe('GameCanvas', () => {
     }
     await wrapper.vm.$nextTick()
 
-    expect(mockCtx.arc).toHaveBeenCalledWith(450.5, 320.0, expect.any(Number), 0, Math.PI * 2)
+    expect(mockCtx.translate).toHaveBeenCalledWith(450.5, 320.0)
   })
 
   it('zeichnet tote Spieler (alive=false) nicht', async () => {
@@ -103,7 +108,7 @@ describe('GameCanvas', () => {
     }
     await wrapper.vm.$nextTick()
 
-    expect(mockCtx.arc).not.toHaveBeenCalledWith(100, 200, expect.any(Number), 0, Math.PI * 2)
+    expect(mockCtx.translate).not.toHaveBeenCalledWith(100, 200)
   })
 
   it('zeichnet Projektile an ihrer x/y Position', async () => {
@@ -139,7 +144,7 @@ describe('GameCanvas', () => {
     }
     await wrapper.vm.$nextTick()
 
-    expect(mockCtx.arc).toHaveBeenCalledWith(900.0, 50.0, expect.any(Number), 0, Math.PI * 2)
+    expect(mockCtx.translate).toHaveBeenCalledWith(900.0, 50.0)
   })
 
   it('verwendet Spielerfarbe aus gameStarting beim Zeichnen', async () => {
