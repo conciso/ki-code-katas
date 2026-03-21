@@ -44,6 +44,11 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                         "{\"type\":\"ERROR\",\"data\":{\"code\":\"LOBBY_NOT_FOUND\",\"message\":\"Lobby nicht gefunden\"}}"));
                 return;
             }
+            if (lobbyService.lobbyFull(lobbyCode)) {
+                session.sendMessage(new TextMessage(
+                        "{\"type\":\"ERROR\",\"data\":{\"code\":\"LOBBY_FULL\",\"message\":\"Die Lobby ist voll (max. 4 Spieler)\"}}"));
+                return;
+            }
             String hostId = lobbyService.getHostId(lobbyCode);
             lobbyService.joinLobby(lobbyCode, session);
             String response = """

@@ -8,6 +8,7 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.client.standard.StandardWebSocketClient;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -239,5 +240,63 @@ class WebSocketConnectionTest {
         assertThat(latch.await(5, TimeUnit.SECONDS)).isTrue();
         assertThat(errorMessage.get()).contains("\"type\":\"ERROR\"");
         assertThat(errorMessage.get()).contains("\"code\":\"LOBBY_NOT_FOUND\"");
+    }
+
+    @Test
+    void shouldReceiveErrorWhenJoiningFullLobby() throws Exception {
+        // Host erstellt Lobby
+        AtomicReference<String> lobbyCode = new AtomicReference<>();
+        CountDownLatch lobbyCreatedLatch = new CountDownLatch(1);
+
+        StandardWebSocketClient client = new StandardWebSocketClient();
+        WebSocketSession hostSession = client.execute(new TextWebSocketHandler() {
+            @Override
+            protected void handleTextMessage(WebSocketSession session, TextMessage message) {
+                if (message.getPayload().contains("\"type\":\"LOBBY_CREATED\"")) {
+                    lobbyCode.set(message.getPayload().replaceAll(".*\"lobbyCode\":\"([^\"]+)\".*", "$1"));
+                    lobbyCreatedLatch.countDown();
+                }
+            }
+        }, "ws://localhost:" + port + "/ws/game?playerName=Host").get(5, TimeUnit.SECONDS);
+
+        hostSession.sendMessage(new TextMessage("{\"type\":\"CREATE_LOBBY\",\"data\":{}}"));
+        assertThat(lobbyCreatedLatch.await(5, TimeUnit.SECONDS)).isTrue();
+
+        // 3 weitere Spieler joinen (Lobby damit voll mit 4)
+        for (String name : List.of("Player2", "Player3", "Player4")) {
+            CountDownLatch joinedLatch = new CountDownLatch(1);
+            WebSocketSession s = client.execute(new TextWebSocketHandler() {
+                @Override
+                protected void handleTextMessage(WebSocketSession session, TextMessage message) {
+                    if (message.getPayload().contains("\"type\":\"LOBBY_STATE\"")) {
+                        joinedLatch.countDown();
+                    }
+                }
+            }, "ws://localhost:" + port + "/ws/game?playerName=" + name).get(5, TimeUnit.SECONDS);
+            s.sendMessage(new TextMessage(
+                    "{\"type\":\"JOIN_LOBBY\",\"data\":{\"lobbyCode\":\"" + lobbyCode.get() + "\"}}"));
+            assertThat(joinedLatch.await(5, TimeUnit.SECONDS)).isTrue();
+        }
+
+        // 5. Spieler versucht beizutreten
+        CountDownLatch errorLatch = new CountDownLatch(1);
+        AtomicReference<String> errorMessage = new AtomicReference<>();
+
+        WebSocketSession fifthPlayer = client.execute(new TextWebSocketHandler() {
+            @Override
+            protected void handleTextMessage(WebSocketSession session, TextMessage message) {
+                if (message.getPayload().contains("\"type\":\"ERROR\"")) {
+                    errorMessage.set(message.getPayload());
+                    errorLatch.countDown();
+                }
+            }
+        }, "ws://localhost:" + port + "/ws/game?playerName=Player5").get(5, TimeUnit.SECONDS);
+
+        fifthPlayer.sendMessage(new TextMessage(
+                "{\"type\":\"JOIN_LOBBY\",\"data\":{\"lobbyCode\":\"" + lobbyCode.get() + "\"}}"));
+
+        assertThat(errorLatch.await(5, TimeUnit.SECONDS)).isTrue();
+        assertThat(errorMessage.get()).contains("\"type\":\"ERROR\"");
+        assertThat(errorMessage.get()).contains("\"code\":\"LOBBY_FULL\"");
     }
 }

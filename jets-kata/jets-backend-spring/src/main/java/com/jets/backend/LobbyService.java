@@ -32,6 +32,10 @@ public class LobbyService {
         return hostIds.containsKey(lobbyCode);
     }
 
+    public boolean lobbyFull(String lobbyCode) {
+        return lobbySessionIds.getOrDefault(lobbyCode, List.of()).size() >= 4;
+    }
+
     public String getHostId(String lobbyCode) {
         return hostIds.get(lobbyCode);
     }
