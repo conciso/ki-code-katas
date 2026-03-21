@@ -268,4 +268,181 @@ public class LobbyFlowTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.Equal("ERROR", GetType(response));
         Assert.Equal("LOBBY_FULL", ParseData(response).GetProperty("code").GetString());
     }
+
+    // --- LEAVE_LOBBY ---
+
+    [Fact]
+    public async Task LeaveLobby_RemainingPlayersReceiveLobbyState()
+    {
+        using var wsHost = await ConnectAsync("Alice");
+        await ReceiveAsync(wsHost);
+        var lobbyCode = await CreateLobbyAndGetCode(wsHost);
+
+        using var wsJoiner = await ConnectAsync("Bob");
+        await ReceiveAsync(wsJoiner);
+        await SendAsync(wsJoiner, new { type = "JOIN_LOBBY", data = new { lobbyCode, playerName = "Bob" } });
+        await ReceiveAsync(wsJoiner); // consume LOBBY_STATE (join)
+        await ReceiveAsync(wsHost);   // consume LOBBY_STATE (join)
+
+        await SendAsync(wsJoiner, new { type = "LEAVE_LOBBY", data = new { } });
+        var update = await ReceiveAsync(wsHost);
+
+        Assert.Equal("LOBBY_STATE", GetType(update));
+        Assert.Equal(1, ParseData(update).GetProperty("players").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task LeaveLobby_HostLeaves_TransfersHost()
+    {
+        using var wsHost = await ConnectAsync("Alice");
+        var hostConnected = ParseData(await ReceiveAsync(wsHost));
+        var lobbyCode = await CreateLobbyAndGetCode(wsHost);
+
+        using var wsJoiner = await ConnectAsync("Bob");
+        var joinerConnected = ParseData(await ReceiveAsync(wsJoiner));
+        var bobId = joinerConnected.GetProperty("playerId").GetString();
+        await SendAsync(wsJoiner, new { type = "JOIN_LOBBY", data = new { lobbyCode, playerName = "Bob" } });
+        await ReceiveAsync(wsJoiner); // consume LOBBY_STATE (join)
+        await ReceiveAsync(wsHost);   // consume LOBBY_STATE (join)
+
+        await SendAsync(wsHost, new { type = "LEAVE_LOBBY", data = new { } });
+        var update = await ReceiveAsync(wsJoiner);
+
+        Assert.Equal("LOBBY_STATE", GetType(update));
+        Assert.Equal(bobId, ParseData(update).GetProperty("hostId").GetString());
+    }
+
+    // --- PLAYER_READY ---
+
+    [Fact]
+    public async Task PlayerReady_BroadcastsLobbyState()
+    {
+        using var wsHost = await ConnectAsync("Alice");
+        await ReceiveAsync(wsHost);
+        var lobbyCode = await CreateLobbyAndGetCode(wsHost);
+
+        using var wsJoiner = await ConnectAsync("Bob");
+        await ReceiveAsync(wsJoiner);
+        await SendAsync(wsJoiner, new { type = "JOIN_LOBBY", data = new { lobbyCode, playerName = "Bob" } });
+        await ReceiveAsync(wsJoiner); // consume LOBBY_STATE
+        await ReceiveAsync(wsHost);   // consume LOBBY_STATE
+
+        await SendAsync(wsJoiner, new { type = "PLAYER_READY", data = new { ready = true } });
+        var update = await ReceiveAsync(wsHost);
+
+        Assert.Equal("LOBBY_STATE", GetType(update));
+        var players = ParseData(update).GetProperty("players");
+        // Bob is second player, should be ready
+        Assert.True(players[1].GetProperty("ready").GetBoolean());
+    }
+
+    [Fact]
+    public async Task PlayerReady_CanToggleOff()
+    {
+        using var wsHost = await ConnectAsync("Alice");
+        await ReceiveAsync(wsHost);
+        var lobbyCode = await CreateLobbyAndGetCode(wsHost);
+
+        using var wsJoiner = await ConnectAsync("Bob");
+        await ReceiveAsync(wsJoiner);
+        await SendAsync(wsJoiner, new { type = "JOIN_LOBBY", data = new { lobbyCode, playerName = "Bob" } });
+        await ReceiveAsync(wsJoiner); // consume LOBBY_STATE
+        await ReceiveAsync(wsHost);   // consume LOBBY_STATE
+
+        await SendAsync(wsJoiner, new { type = "PLAYER_READY", data = new { ready = true } });
+        await ReceiveAsync(wsHost);   // consume LOBBY_STATE
+        await ReceiveAsync(wsJoiner); // consume LOBBY_STATE
+
+        await SendAsync(wsJoiner, new { type = "PLAYER_READY", data = new { ready = false } });
+        var update = await ReceiveAsync(wsJoiner);
+
+        var players = ParseData(update).GetProperty("players");
+        Assert.False(players[1].GetProperty("ready").GetBoolean());
+    }
+
+    // --- START_GAME ---
+
+    [Fact]
+    public async Task StartGame_NonHostGetsError()
+    {
+        using var wsHost = await ConnectAsync("Alice");
+        await ReceiveAsync(wsHost);
+        var lobbyCode = await CreateLobbyAndGetCode(wsHost);
+
+        using var wsJoiner = await ConnectAsync("Bob");
+        await ReceiveAsync(wsJoiner);
+        await SendAsync(wsJoiner, new { type = "JOIN_LOBBY", data = new { lobbyCode, playerName = "Bob" } });
+        await ReceiveAsync(wsJoiner);
+        await ReceiveAsync(wsHost);
+
+        await SendAsync(wsJoiner, new { type = "START_GAME", data = new { } });
+        var response = await ReceiveAsync(wsJoiner);
+
+        Assert.Equal("ERROR", GetType(response));
+        Assert.Equal("NOT_HOST", ParseData(response).GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task StartGame_NotEnoughPlayers_GetsError()
+    {
+        using var wsHost = await ConnectAsync("Alice");
+        await ReceiveAsync(wsHost);
+        await CreateLobbyAndGetCode(wsHost);
+
+        await SendAsync(wsHost, new { type = "START_GAME", data = new { } });
+        var response = await ReceiveAsync(wsHost);
+
+        Assert.Equal("ERROR", GetType(response));
+    }
+
+    [Fact]
+    public async Task StartGame_NotAllReady_GetsError()
+    {
+        using var wsHost = await ConnectAsync("Alice");
+        await ReceiveAsync(wsHost);
+        var lobbyCode = await CreateLobbyAndGetCode(wsHost);
+
+        using var wsJoiner = await ConnectAsync("Bob");
+        await ReceiveAsync(wsJoiner);
+        await SendAsync(wsJoiner, new { type = "JOIN_LOBBY", data = new { lobbyCode, playerName = "Bob" } });
+        await ReceiveAsync(wsJoiner);
+        await ReceiveAsync(wsHost);
+
+        // Only host is ready, Bob is not
+        await SendAsync(wsHost, new { type = "PLAYER_READY", data = new { ready = true } });
+        await ReceiveAsync(wsHost);
+        await ReceiveAsync(wsJoiner);
+
+        await SendAsync(wsHost, new { type = "START_GAME", data = new { } });
+        var response = await ReceiveAsync(wsHost);
+
+        Assert.Equal("ERROR", GetType(response));
+    }
+
+    [Fact]
+    public async Task StartGame_AllReady_SendsGameStarting()
+    {
+        using var wsHost = await ConnectAsync("Alice");
+        await ReceiveAsync(wsHost);
+        var lobbyCode = await CreateLobbyAndGetCode(wsHost);
+
+        using var wsJoiner = await ConnectAsync("Bob");
+        await ReceiveAsync(wsJoiner);
+        await SendAsync(wsJoiner, new { type = "JOIN_LOBBY", data = new { lobbyCode, playerName = "Bob" } });
+        await ReceiveAsync(wsJoiner);
+        await ReceiveAsync(wsHost);
+
+        // Both ready
+        await SendAsync(wsHost, new { type = "PLAYER_READY", data = new { ready = true } });
+        await ReceiveAsync(wsHost);
+        await ReceiveAsync(wsJoiner);
+        await SendAsync(wsJoiner, new { type = "PLAYER_READY", data = new { ready = true } });
+        await ReceiveAsync(wsHost);
+        await ReceiveAsync(wsJoiner);
+
+        await SendAsync(wsHost, new { type = "START_GAME", data = new { } });
+        var response = await ReceiveAsync(wsHost);
+
+        Assert.Equal("GAME_STARTING", GetType(response));
+    }
 }

@@ -11,6 +11,7 @@ public class GameManager
 
     private readonly ConcurrentDictionary<string, Player> _players = new();
     private readonly ConcurrentDictionary<string, Lobby> _lobbies = new();
+    private readonly ConcurrentDictionary<string, string> _playerLobby = new(); // playerId -> lobbyCode
 
     public async Task HandleConnectionAsync(WebSocket socket, string playerName)
     {
@@ -81,6 +82,19 @@ public class GameManager
                     await HandleJoinLobby(player, lobbyCode);
                     break;
 
+                case "LEAVE_LOBBY":
+                    await HandleLeaveLobby(player);
+                    break;
+
+                case "PLAYER_READY":
+                    var ready = doc.RootElement.GetProperty("data").GetProperty("ready").GetBoolean();
+                    await HandlePlayerReady(player, ready);
+                    break;
+
+                case "START_GAME":
+                    await HandleStartGame(player);
+                    break;
+
                 default:
                     await SendAsync(player.Socket, ErrorResponse("INVALID_MESSAGE", $"Unknown message type: {type}"));
                     break;
@@ -100,6 +114,7 @@ public class GameManager
     {
         var lobby = new Lobby(player);
         _lobbies[lobby.Code] = lobby;
+        _playerLobby[player.Id] = lobby.Code;
 
         await SendAsync(player.Socket, new
         {
@@ -125,7 +140,87 @@ public class GameManager
         }
 
         lobby.AddPlayer(player);
+        _playerLobby[player.Id] = lobbyCode;
         await SendLobbyState(lobby);
+    }
+
+    private async Task HandleLeaveLobby(Player player)
+    {
+        if (!TryGetPlayerLobby(player, out var lobby))
+            return;
+
+        lobby.RemovePlayer(player.Id);
+        _playerLobby.TryRemove(player.Id, out _);
+
+        if (lobby.Players.Count == 0)
+            _lobbies.TryRemove(lobby.Code, out _);
+        else
+            await SendLobbyState(lobby);
+    }
+
+    private async Task HandlePlayerReady(Player player, bool ready)
+    {
+        if (!TryGetPlayerLobby(player, out var lobby))
+            return;
+
+        var lobbyPlayer = lobby.Players.FirstOrDefault(p => p.Id == player.Id);
+        if (lobbyPlayer != null)
+        {
+            lobbyPlayer.Ready = ready;
+            await SendLobbyState(lobby);
+        }
+    }
+
+    private async Task HandleStartGame(Player player)
+    {
+        if (!TryGetPlayerLobby(player, out var lobby))
+            return;
+
+        if (lobby.HostId != player.Id)
+        {
+            await SendAsync(player.Socket, ErrorResponse("NOT_HOST", "Nur der Host darf das Spiel starten"));
+            return;
+        }
+
+        if (lobby.Players.Count < 2)
+        {
+            await SendAsync(player.Socket, ErrorResponse("INVALID_MESSAGE", "Mindestens 2 Spieler erforderlich"));
+            return;
+        }
+
+        if (!lobby.Players.All(p => p.Ready))
+        {
+            await SendAsync(player.Socket, ErrorResponse("INVALID_MESSAGE", "Nicht alle Spieler sind bereit"));
+            return;
+        }
+
+        var gameStarting = new
+        {
+            type = "GAME_STARTING",
+            data = new
+            {
+                countdown = 3,
+                gameMode = lobby.GameMode,
+                players = lobby.Players.Select(p => new
+                {
+                    id = p.Id,
+                    name = p.Name,
+                    color = p.Color
+                })
+            }
+        };
+
+        foreach (var lp in lobby.Players)
+        {
+            if (_players.TryGetValue(lp.Id, out var cp) && cp.Socket.State == WebSocketState.Open)
+                await SendAsync(cp.Socket, gameStarting);
+        }
+    }
+
+    private bool TryGetPlayerLobby(Player player, out Lobby lobby)
+    {
+        lobby = null!;
+        return _playerLobby.TryGetValue(player.Id, out var code) && _lobbies.TryGetValue(code, out lobby!);
     }
 
     private async Task SendLobbyState(Lobby lobby)
