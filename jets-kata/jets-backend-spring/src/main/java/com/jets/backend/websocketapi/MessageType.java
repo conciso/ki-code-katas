@@ -9,6 +9,8 @@ enum MessageType {
     PLAYER_READY,
     ERROR,
     PING,
-    PONG
+    PONG,
+    START_GAME,
+    GAME_STARTING
 }
 
