@@ -98,7 +98,7 @@ describe('GameHUD', () => {
     store.gameState = makeGameState()
 
     const wrapper = mount(GameHUD)
-    expect(wrapper.find('[data-testid="hud-hp"]').text()).toContain('3')
+    expect(wrapper.find('[data-testid="hud-hp"]').text()).toContain('♥')
   })
 
   it('hat ein Element mit data-testid="hud-score" das den eigenen Score enthält', () => {

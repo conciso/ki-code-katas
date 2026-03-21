@@ -33,10 +33,8 @@ useKeyboardInput()
 .game-hud {
   position: absolute;
   top: 1rem;
-  left: 1rem;
   right: 1rem;
-  display: flex;
-  gap: 1.5rem;
   pointer-events: none;
+  z-index: 10;
 }
 </style>

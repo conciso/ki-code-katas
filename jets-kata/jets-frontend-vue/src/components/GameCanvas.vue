@@ -3,7 +3,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, watchEffect } from 'vue'
 import { useGameStore } from '@/stores/useGameStore'
 
 const canvasEl = ref<HTMLCanvasElement | null>(null)
@@ -11,15 +11,14 @@ const store = useGameStore()
 const prevPositions = new Map<string, { x: number; y: number }>()
 const playerAngles = new Map<string, number>()
 
-watch(
-  () => store.gameStarting,
-  (gs) => {
-    if (!gs || !canvasEl.value) return
-    canvasEl.value.width = gs.fieldWidth
-    canvasEl.value.height = gs.fieldHeight
-  },
-  { immediate: true },
-)
+// watchEffect reruns when canvasEl mounts AND when gameStarting arrives
+watchEffect(() => {
+  const gs = store.gameStarting
+  const canvas = canvasEl.value
+  if (!gs || !canvas) return
+  canvas.width = gs.fieldWidth
+  canvas.height = gs.fieldHeight
+})
 
 watch(
   () => store.gameState,
@@ -33,7 +32,7 @@ watch(
     const startingPlayers = store.gameStarting?.players ?? []
     const colorOf = (id: string) => startingPlayers.find((p) => p.id === id)?.color ?? '#ffffff'
 
-    for (const p of state.players) {
+    for (const p of (state.players ?? [])) {
       if (!p.alive) continue
       const prev = prevPositions.get(p.id)
       let angle = playerAngles.get(p.id) ?? 0
@@ -49,14 +48,14 @@ watch(
       drawShip(ctx, p.x, p.y, colorOf(p.id), angle)
     }
 
-    for (const b of state.projectiles) {
+    for (const b of (state.projectiles ?? [])) {
       ctx.fillStyle = colorOf(b.owner)
       ctx.beginPath()
       ctx.arc(b.x, b.y, 3, 0, Math.PI * 2)
       ctx.fill()
     }
 
-    for (const e of state.enemies) {
+    for (const e of (state.enemies ?? [])) {
       drawEnemy(ctx, e.x, e.y)
     }
   },
