@@ -1,12 +1,14 @@
 package com.jets.backend.websocketapi;
 
+import com.jets.backend.core.model.Lobby;
+import com.jets.backend.core.model.PlayerInfo;
+import com.jets.backend.core.service.LobbyService;
 import tools.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -16,17 +18,14 @@ import java.util.concurrent.ConcurrentHashMap;
 public class JetsWebSocketHandler extends TextWebSocketHandler {
 
     private static final int SERVER_TICK_RATE = 30;
-    private static final String DEFAULT_GAME_MODE = "COOP";
-    private static final List<String> PLAYER_COLORS = List.of(
-            "#FF4444", "#4444FF", "#44FF44", "#FFFF44"
-    );
 
     private final ObjectMapper objectMapper;
+    private final LobbyService lobbyService;
     private final Map<String, PlayerInfo> players = new ConcurrentHashMap<>();
-    private final Map<String, Lobby> lobbies = new ConcurrentHashMap<>();
 
-    public JetsWebSocketHandler(ObjectMapper objectMapper) {
+    public JetsWebSocketHandler(ObjectMapper objectMapper, LobbyService lobbyService) {
         this.objectMapper = objectMapper;
+        this.lobbyService = lobbyService;
     }
 
     @Override
@@ -43,22 +42,33 @@ public class JetsWebSocketHandler extends TextWebSocketHandler {
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
         IncomingMessage msg = objectMapper.readValue(message.getPayload(), IncomingMessage.class);
 
-        if ("CREATE_LOBBY".equals(msg.type())) {
+        if (MessageType.CREATE_LOBBY.equals(msg.type())) {
             handleCreateLobby(session);
+        } else if (MessageType.JOIN_LOBBY.equals(msg.type())) {
+            handleJoinLobby(session, msg.data().get("lobbyCode").stringValue());
         }
     }
 
     private void handleCreateLobby(WebSocketSession session) throws Exception {
         PlayerInfo player = players.get(session.getId());
-        String lobbyCode = generateLobbyCode();
-        String color = PLAYER_COLORS.get(0);
+        Lobby lobby = lobbyService.createLobby(player);
 
-        LobbyPlayer lobbyPlayer = new LobbyPlayer(player.id(), player.name(), false, color);
-        Lobby lobby = new Lobby(lobbyCode, player.id(), DEFAULT_GAME_MODE, new ArrayList<>(List.of(lobbyPlayer)));
-        lobbies.put(lobbyCode, lobby);
+        send(session, WsMessage.lobbyCreated(new LobbyCreatedData(lobby.code(), lobby.hostId())));
+        broadcastLobbyState(lobby.code());
+    }
 
-        send(session, WsMessage.lobbyCreated(new LobbyCreatedData(lobbyCode, player.id())));
-        send(session, WsMessage.lobbyState(toLobbyStateData(lobby)));
+    private void handleJoinLobby(WebSocketSession session, String lobbyCode) throws Exception {
+        PlayerInfo player = players.get(session.getId());
+        lobbyService.joinLobby(lobbyCode, player);
+        broadcastLobbyState(lobbyCode);
+    }
+
+    private void broadcastLobbyState(String lobbyCode) throws Exception {
+        Lobby lobby = lobbyService.getLobby(lobbyCode);
+        WsMessage<LobbyStateData> msg = WsMessage.lobbyState(toLobbyStateData(lobby));
+        for (WebSocketSession s : lobbyService.getLobbySessionList(lobbyCode)) {
+            if (s.isOpen()) send(s, msg);
+        }
     }
 
     private LobbyStateData toLobbyStateData(Lobby lobby) {
@@ -90,8 +100,4 @@ public class JetsWebSocketHandler extends TextWebSocketHandler {
         }
         return "";
     }
-
-    private record PlayerInfo(String id, String name, WebSocketSession session) {}
-    private record LobbyPlayer(String id, String name, boolean ready, String color) {}
-    private record Lobby(String code, String hostId, String gameMode, List<LobbyPlayer> players) {}
 }

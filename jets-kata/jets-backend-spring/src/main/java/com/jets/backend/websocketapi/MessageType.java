@@ -4,6 +4,7 @@ enum MessageType {
     CONNECTED,
     LOBBY_CREATED,
     LOBBY_STATE,
-    CREATE_LOBBY
+    CREATE_LOBBY,
+    JOIN_LOBBY
 }
 

@@ -1,3 +1,5 @@
 package com.jets.backend.websocketapi;
 
-record IncomingMessage(String type) {}
+import tools.jackson.databind.JsonNode;
+
+record IncomingMessage(MessageType type, JsonNode data) {}
