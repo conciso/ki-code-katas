@@ -453,6 +453,17 @@ public class LobbyFlowTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.Equal("Bob", players[1].GetProperty("name").GetString());
         Assert.False(string.IsNullOrEmpty(players[0].GetProperty("color").GetString()));
         Assert.False(string.IsNullOrEmpty(players[0].GetProperty("id").GetString()));
+
+        // Spielfeld-Dimensionen
+        Assert.Equal(1920, data.GetProperty("fieldWidth").GetInt32());
+        Assert.Equal(1080, data.GetProperty("fieldHeight").GetInt32());
+
+        // Spawn-Positionen
+        Assert.True(players[0].TryGetProperty("spawnX", out _));
+        Assert.True(players[0].TryGetProperty("spawnY", out _));
+        Assert.NotEqual(
+            players[0].GetProperty("spawnX").GetDouble(),
+            players[1].GetProperty("spawnX").GetDouble());
     }
 
     [Fact]

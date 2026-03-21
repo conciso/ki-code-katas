@@ -110,6 +110,10 @@ public class GameManager
                     HandlePlayerInput(player, doc.RootElement.GetProperty("data"));
                     break;
 
+                case "RETURN_TO_LOBBY":
+                    await HandleReturnToLobby(player);
+                    break;
+
                 default:
                     _logger.LogWarning("Unknown message type '{Type}' from {PlayerId}", type, player.Id);
                     await SendAsync(player.Socket, ErrorResponse("INVALID_MESSAGE", $"Unknown message type: {type}"));
@@ -234,6 +238,9 @@ public class GameManager
 
         _logger.LogInformation("Game starting in lobby {LobbyCode} with {Count} players", lobby.Code, lobby.Players.Count);
 
+        var session = new GameSession(
+            lobby.Players.Select(p => (p.Id, p.Name, p.Color)).ToList());
+
         var gameStarting = new
         {
             type = "GAME_STARTING",
@@ -241,11 +248,15 @@ public class GameManager
             {
                 countdown = 3,
                 gameMode = lobby.GameMode,
-                players = lobby.Players.Select(p => new
+                fieldWidth = (int)GameSession.FieldWidth,
+                fieldHeight = (int)GameSession.FieldHeight,
+                players = session.Players.Select(p => new
                 {
                     id = p.Id,
                     name = p.Name,
-                    color = p.Color
+                    color = p.Color,
+                    spawnX = p.X,
+                    spawnY = p.Y
                 })
             }
         };
@@ -255,12 +266,33 @@ public class GameManager
             if (_players.TryGetValue(lp.Id, out var cp) && cp.Socket.State == WebSocketState.Open)
                 await SendAsync(cp.Socket, gameStarting);
         }
-
-        var session = new GameSession(
-            lobby.Players.Select(p => (p.Id, p.Name, p.Color)).ToList());
         _lobbySessions[lobby.Code] = session;
 
         _ = RunGameLoop(session, lobby);
+    }
+
+    private async Task HandleReturnToLobby(Player player)
+    {
+        if (!TryGetPlayerLobby(player, out var lobby))
+            return;
+
+        if (lobby.HostId != player.Id)
+        {
+            _logger.LogWarning("Return to lobby denied, not host: {PlayerId} in lobby {LobbyCode}", player.Id, lobby.Code);
+            await SendAsync(player.Socket, ErrorResponse("NOT_HOST", "Nur der Host darf diese Aktion ausführen"));
+            return;
+        }
+
+        // Stop game session
+        if (_lobbySessions.TryRemove(lobby.Code, out var session))
+            session.Stop();
+
+        // Reset ready status
+        foreach (var lp in lobby.Players)
+            lp.Ready = false;
+
+        _logger.LogInformation("Returned to lobby {LobbyCode}", lobby.Code);
+        await SendLobbyState(lobby);
     }
 
     private void HandlePlayerInput(Player player, JsonElement data)
@@ -290,6 +322,12 @@ public class GameManager
         {
             var events = session.Tick();
             await BroadcastGameState(session, lobby);
+
+            foreach (var evt in events)
+            {
+                await BroadcastToLobby(lobby, new { type = "GAME_EVENT", data = evt });
+            }
+
             await Task.Delay(tickInterval);
         }
 
@@ -317,6 +355,7 @@ public class GameManager
                     alive = p.Alive,
                     respawnIn = p.RespawnIn,
                     invincible = p.Invincible,
+                    activePowerUp = (string?)null,
                     lastProcessedInput = p.LastProcessedInput
                 }),
                 projectiles = session.Projectiles.Select(p => new
@@ -396,6 +435,15 @@ public class GameManager
             {
                 await SendAsync(connectedPlayer.Socket, state);
             }
+        }
+    }
+
+    private async Task BroadcastToLobby(Lobby lobby, object message)
+    {
+        foreach (var lp in lobby.Players)
+        {
+            if (_players.TryGetValue(lp.Id, out var cp) && cp.Socket.State == WebSocketState.Open)
+                await SendAsync(cp.Socket, message);
         }
     }
 

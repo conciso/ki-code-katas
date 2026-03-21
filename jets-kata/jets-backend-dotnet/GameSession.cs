@@ -47,6 +47,11 @@ public class GameSession
         _activePlayers.Remove(playerId);
     }
 
+    public void Stop()
+    {
+        IsRunning = false;
+    }
+
     public void SetInput(string playerId, PlayerInput input)
     {
         var player = Players.FirstOrDefault(p => p.Id == playerId);
