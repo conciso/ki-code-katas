@@ -2,9 +2,21 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
+import { createRouter, createMemoryHistory } from 'vue-router'
 import { useGameStore } from '@/stores/useGameStore'
 import LobbyView from './LobbyView.vue'
 import type { Lobby } from '@/types'
+
+function makeRouter() {
+  return createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: '/', component: { template: '<div/>' } },
+      { path: '/create', component: { template: '<div/>' } },
+      { path: '/game', component: { template: '<div/>' } },
+    ],
+  })
+}
 
 const LOBBY: Lobby = {
   lobbyCode: 'A3F9K2',
@@ -25,7 +37,7 @@ describe('LobbyView', () => {
     const store = useGameStore()
     store.lobby = { ...LOBBY, ...overrides }
     store.playerId = 'p1a2b3c4'
-    return { wrapper: mount(LobbyView), store }
+    return { wrapper: mount(LobbyView, { global: { plugins: [makeRouter()] } }), store }
   }
 
   // ── Lobby-Info ─────────────────────────────────────────────────────────
@@ -68,7 +80,7 @@ describe('LobbyView', () => {
     const store = useGameStore()
     store.lobby = { ...LOBBY, players: [{ id: 'p1a2b3c4', name: 'Alice', ready: false, color: '#FF4444' }] }
     store.playerId = 'p1a2b3c4'
-    const wrapper = mount(LobbyView)
+    const wrapper = mount(LobbyView, { global: { plugins: [makeRouter()] } })
 
     expect(wrapper.find('[data-testid="btn-ready"]').exists()).toBe(true)
   })
@@ -78,7 +90,7 @@ describe('LobbyView', () => {
     store.lobby = { ...LOBBY, players: [{ id: 'p1a2b3c4', name: 'Alice', ready: false, color: '#FF4444' }] }
     store.playerId = 'p1a2b3c4'
     vi.spyOn(store, 'setReady').mockImplementation(() => {})
-    const wrapper = mount(LobbyView)
+    const wrapper = mount(LobbyView, { global: { plugins: [makeRouter()] } })
 
     await wrapper.find('[data-testid="btn-ready"]').trigger('click')
 
@@ -90,7 +102,7 @@ describe('LobbyView', () => {
     store.lobby = { ...LOBBY, players: [{ id: 'p1a2b3c4', name: 'Alice', ready: true, color: '#FF4444' }] }
     store.playerId = 'p1a2b3c4'
     vi.spyOn(store, 'setReady').mockImplementation(() => {})
-    const wrapper = mount(LobbyView)
+    const wrapper = mount(LobbyView, { global: { plugins: [makeRouter()] } })
 
     await wrapper.find('[data-testid="btn-ready"]').trigger('click')
 
@@ -108,7 +120,7 @@ describe('LobbyView', () => {
     const store = useGameStore()
     store.lobby = LOBBY
     store.playerId = 'p2d5e6f7'
-    const wrapper = mount(LobbyView)
+    const wrapper = mount(LobbyView, { global: { plugins: [makeRouter()] } })
 
     expect(wrapper.find('[data-testid="btn-start"]').exists()).toBe(false)
   })
@@ -154,6 +166,42 @@ describe('LobbyView', () => {
     vi.spyOn(store, 'leaveLobby').mockImplementation(() => {})
 
     await wrapper.find('[data-testid="btn-leave"]').trigger('click')
+
+    expect(store.leaveLobby).toHaveBeenCalled()
+  })
+
+  it('navigiert zu /create wenn lobby null wird', async () => {
+    const store = useGameStore()
+    store.lobby = LOBBY
+    store.playerId = 'p1a2b3c4'
+    const router = makeRouter()
+    vi.spyOn(router, 'push').mockImplementation(async () => {})
+
+    mount(LobbyView, { global: { plugins: [router] } })
+    store.lobby = null
+    await new Promise((r) => setTimeout(r, 0))
+
+    expect(router.push).toHaveBeenCalledWith('/create')
+  })
+
+  it('zeigt "Session beenden"-Button nur für den Host', () => {
+    const { wrapper } = mountWithLobby()
+    expect(wrapper.find('[data-testid="btn-end-session"]').exists()).toBe(true)
+  })
+
+  it('zeigt keinen "Session beenden"-Button für normale Spieler', () => {
+    const store = useGameStore()
+    store.lobby = LOBBY
+    store.playerId = 'p2d5e6f7'
+    const wrapper = mount(LobbyView, { global: { plugins: [makeRouter()] } })
+    expect(wrapper.find('[data-testid="btn-end-session"]').exists()).toBe(false)
+  })
+
+  it('ruft leaveLobby() auf beim Klick auf "Session beenden"', async () => {
+    const { wrapper, store } = mountWithLobby()
+    vi.spyOn(store, 'leaveLobby').mockImplementation(() => {})
+
+    await wrapper.find('[data-testid="btn-end-session"]').trigger('click')
 
     expect(store.leaveLobby).toHaveBeenCalled()
   })

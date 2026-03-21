@@ -26,10 +26,8 @@ useKeyboardInput()
 
 .game-canvas {
   display: block;
-  max-width: 100vw;
-  max-height: 100vh;
-  aspect-ratio: 16 / 9;
-  object-fit: contain;
+  width: min(100vw, calc(100vh * 16 / 9));
+  height: min(100vh, calc(100vw * 9 / 16));
 }
 
 .game-hud {

@@ -40,6 +40,15 @@
         Spiel starten
       </BaseButton>
 
+      <BaseButton
+        v-if="store.isHost"
+        data-testid="btn-end-session"
+        variant="danger"
+        @click="store.leaveLobby()"
+      >
+        Session beenden
+      </BaseButton>
+
       <BaseButton data-testid="btn-leave" @click="store.leaveLobby()">
         Verlassen
       </BaseButton>
@@ -58,6 +67,10 @@ const router = useRouter()
 
 watch(() => store.gameStarting, (gs) => {
   if (gs) router.push('/game')
+})
+
+watch(() => store.lobby, (lobby) => {
+  if (!lobby) router.push('/create')
 })
 
 const ownPlayer = computed(() =>

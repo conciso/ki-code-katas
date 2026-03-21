@@ -8,6 +8,8 @@ import { useGameStore } from '@/stores/useGameStore'
 
 const canvasEl = ref<HTMLCanvasElement | null>(null)
 const store = useGameStore()
+const prevPositions = new Map<string, { x: number; y: number }>()
+const playerAngles = new Map<string, number>()
 
 watch(
   () => store.gameStarting,
@@ -33,7 +35,18 @@ watch(
 
     for (const p of state.players) {
       if (!p.alive) continue
-      drawShip(ctx, p.x, p.y, colorOf(p.id))
+      const prev = prevPositions.get(p.id)
+      let angle = playerAngles.get(p.id) ?? 0
+      if (prev) {
+        const dx = p.x - prev.x
+        const dy = p.y - prev.y
+        if (Math.hypot(dx, dy) > 0.5) {
+          angle = Math.atan2(dy, dx) + Math.PI / 2
+          playerAngles.set(p.id, angle)
+        }
+      }
+      prevPositions.set(p.id, { x: p.x, y: p.y })
+      drawShip(ctx, p.x, p.y, colorOf(p.id), angle)
     }
 
     for (const b of state.projectiles) {
@@ -49,10 +62,11 @@ watch(
   },
 )
 
-function drawShip(ctx: CanvasRenderingContext2D, x: number, y: number, color: string) {
+function drawShip(ctx: CanvasRenderingContext2D, x: number, y: number, color: string, rotation = 0) {
   const s = 20
   ctx.save()
   ctx.translate(x, y)
+  ctx.rotate(rotation)
 
   // Hull
   ctx.fillStyle = color
