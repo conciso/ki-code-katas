@@ -75,6 +75,36 @@ class StartGameTest {
         assertThat(bobPlayer.get("name").stringValue()).isEqualTo("Bob");
     }
 
+    @Test
+    void shouldReturnErrorWhenNonHostStartsGame() throws Exception {
+        var aliceMessages = new ArrayBlockingQueue<String>(20);
+        var bobMessages   = new ArrayBlockingQueue<String>(20);
+
+        WebSocketSession aliceSession = connect("Alice", aliceMessages);
+        receiveConnected(aliceMessages);
+        String lobbyCode = createLobby(aliceSession, aliceMessages);
+
+        WebSocketSession bobSession = connect("Bob", bobMessages);
+        receiveConnected(bobMessages);
+        sendJoinLobby(bobSession, lobbyCode);
+        receiveLobbyState(bobMessages);
+        receiveLobbyState(aliceMessages);
+
+        sendPlayerReady(aliceSession, true);
+        receiveLobbyState(aliceMessages);
+        receiveLobbyState(bobMessages);
+
+        sendPlayerReady(bobSession, true);
+        receiveLobbyState(aliceMessages);
+        receiveLobbyState(bobMessages);
+
+        // Bob ist nicht Host und darf START_GAME nicht auslösen
+        sendStartGame(bobSession);
+
+        JsonNode error = receiveError(bobMessages);
+        assertThat(error.get("code").stringValue()).isEqualTo("NOT_HOST");
+    }
+
 
     // -------------------------------------------------------------------------
     // Hilfsmethoden
@@ -148,6 +178,14 @@ class StartGameTest {
         assertThat(raw).as("Keine GAME_STARTING-Nachricht erhalten").isNotNull();
         JsonNode msg = objectMapper.readTree(raw);
         assertThat(msg.get("type").stringValue()).isEqualTo("GAME_STARTING");
+        return msg.get("data");
+    }
+
+    private JsonNode receiveError(ArrayBlockingQueue<String> messages) throws Exception {
+        String raw = messages.poll(3, TimeUnit.SECONDS);
+        assertThat(raw).as("Keine ERROR-Nachricht erhalten").isNotNull();
+        JsonNode msg = objectMapper.readTree(raw);
+        assertThat(msg.get("type").stringValue()).isEqualTo("ERROR");
         return msg.get("data");
     }
 
