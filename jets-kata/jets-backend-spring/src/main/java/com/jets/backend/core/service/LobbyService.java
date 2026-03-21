@@ -70,6 +70,9 @@ public class LobbyService {
         if (lobby == null) {
             throw new LobbyException("LOBBY_NOT_FOUND", "Lobby existiert nicht");
         }
+        if (!hostId.equals(lobby.hostId())) {
+            throw new LobbyException("NOT_HOST", "Nur der Host darf das Spiel starten");
+        }
     }
 
     private String generateLobbyCode() {
