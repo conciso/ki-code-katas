@@ -4,6 +4,7 @@ import com.jets.backend.core.model.Lobby;
 import com.jets.backend.core.model.PlayerInfo;
 import com.jets.backend.core.service.LobbyException;
 import com.jets.backend.core.service.LobbyService;
+import com.jets.backend.core.service.StartGameUseCase;
 import tools.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.TextMessage;
@@ -23,13 +24,15 @@ public class JetsWebSocketHandler extends TextWebSocketHandler {
 
     private final ObjectMapper objectMapper;
     private final LobbyService lobbyService;
+    private final StartGameUseCase startGameUseCase;
     private final Map<String, PlayerInfo> players = new ConcurrentHashMap<>();
     private final Map<String, String> playerLobby = new ConcurrentHashMap<>();
     private final Map<MessageType, MessageHandler> handlers = new HashMap<>();
 
-    public JetsWebSocketHandler(ObjectMapper objectMapper, LobbyService lobbyService) {
+    public JetsWebSocketHandler(ObjectMapper objectMapper, LobbyService lobbyService, StartGameUseCase startGameUseCase) {
         this.objectMapper = objectMapper;
         this.lobbyService = lobbyService;
+        this.startGameUseCase = startGameUseCase;
         initializeHandlers();
     }
 
@@ -136,7 +139,7 @@ public class JetsWebSocketHandler extends TextWebSocketHandler {
         String lobbyCode = playerLobby.get(session.getId());
         
         try {
-            lobbyService.startGame(lobbyCode, player.id());
+            startGameUseCase.execute(lobbyCode, player.id());
         } catch (LobbyException e) {
             send(session, WsMessage.error(new ErrorData(e.getErrorCode(), e.getMessage())));
             return;
