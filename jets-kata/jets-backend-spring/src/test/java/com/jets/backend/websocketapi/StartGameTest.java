@@ -152,6 +152,45 @@ class StartGameTest {
         assertThat(error.get("code").stringValue()).isEqualTo("NOT_ENOUGH_PLAYERS");
     }
 
+    @Test
+    void shouldReturnErrorWhenTryingToJoinLobbyWithGameInProgress() throws Exception {
+        var aliceMessages = new ArrayBlockingQueue<String>(20);
+        var bobMessages   = new ArrayBlockingQueue<String>(20);
+        var charlieMessages = new ArrayBlockingQueue<String>(20);
+
+        // Alice erstellt Lobby, Bob tritt bei
+        WebSocketSession aliceSession = connect("Alice", aliceMessages);
+        receiveConnected(aliceMessages);
+        String lobbyCode = createLobby(aliceSession, aliceMessages);
+
+        WebSocketSession bobSession = connect("Bob", bobMessages);
+        receiveConnected(bobMessages);
+        sendJoinLobby(bobSession, lobbyCode);
+        receiveLobbyState(bobMessages);
+        receiveLobbyState(aliceMessages);
+
+        // Beide bereit, Alice startet das Spiel
+        sendPlayerReady(aliceSession, true);
+        receiveLobbyState(aliceMessages);
+        receiveLobbyState(bobMessages);
+
+        sendPlayerReady(bobSession, true);
+        receiveLobbyState(aliceMessages);
+        receiveLobbyState(bobMessages);
+
+        sendStartGame(aliceSession);
+        receiveGameStarting(aliceMessages);
+        receiveGameStarting(bobMessages);
+
+        // Charlie versucht beizutreten — Spiel läuft bereits
+        WebSocketSession charlieSession = connect("Charlie", charlieMessages);
+        receiveConnected(charlieMessages);
+        sendJoinLobby(charlieSession, lobbyCode);
+
+        JsonNode error = receiveError(charlieMessages);
+        assertThat(error.get("code").stringValue()).isEqualTo("GAME_IN_PROGRESS");
+    }
+
     // -------------------------------------------------------------------------
     // Hilfsmethoden
     // -------------------------------------------------------------------------
