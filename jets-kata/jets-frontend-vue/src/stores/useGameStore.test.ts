@@ -9,7 +9,7 @@ class MockWebSocket {
   onmessage: ((event: MessageEvent) => void) | null = null
   onclose: ((event: CloseEvent) => void) | null = null
   onerror: ((event: Event) => void) | null = null
-  readyState = WebSocket.CONNECTING
+  readyState: number = WebSocket.CONNECTING
 
   constructor(url: string) {
     this.url = url
@@ -445,5 +445,68 @@ describe('useGameStore — Lobby-Nachrichten', () => {
 
     expect(store.gameEvents).toHaveLength(1)
     expect(store.gameEvents[0]).toMatchObject({ playerId: 'p2d5e6f7', playerName: 'Bob' })
+  })
+})
+
+describe('useGameStore — Lobby erstellen', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    MockWebSocket.instances = []
+    vi.stubGlobal('WebSocket', MockWebSocket)
+  })
+
+  function connectAndOpen(store: ReturnType<typeof useGameStore>, playerName = 'Alice') {
+    store.connect(playerName)
+    const ws = MockWebSocket.instances[0]!
+    ws.simulateOpen()
+    ws.simulateMessage({ type: 'CONNECTED', data: { playerId: 'p1a2b3c4', serverTickRate: 30 } })
+    return ws
+  }
+
+  it('isHost ist initial false', () => {
+    const store = useGameStore()
+    expect(store.isHost).toBe(false)
+  })
+
+  it('createLobby() sendet CREATE_LOBBY mit dem Spielernamen', () => {
+    const store = useGameStore()
+    const ws = connectAndOpen(store, 'Alice')
+
+    store.createLobby()
+
+    expect(ws.send).toHaveBeenCalledWith(
+      JSON.stringify({ type: 'CREATE_LOBBY', data: { playerName: 'Alice' } }),
+    )
+  })
+
+  it('isHost ist true wenn eigene playerId dem hostId entspricht', () => {
+    const store = useGameStore()
+    const ws = connectAndOpen(store)
+
+    ws.simulateMessage({ type: 'LOBBY_CREATED', data: { lobbyCode: 'A3F9K2', hostId: 'p1a2b3c4' } })
+
+    expect(store.isHost).toBe(true)
+  })
+
+  it('isHost ist false wenn ein anderer Spieler Host ist', () => {
+    const store = useGameStore()
+    const ws = connectAndOpen(store)
+
+    ws.simulateMessage({ type: 'LOBBY_CREATED', data: { lobbyCode: 'A3F9K2', hostId: 'p9anderer' } })
+
+    expect(store.isHost).toBe(false)
+  })
+
+  it('isHost bleibt aktuell nach LOBBY_STATE (z.B. Host-Wechsel)', () => {
+    const store = useGameStore()
+    const ws = connectAndOpen(store)
+
+    ws.simulateMessage({ type: 'LOBBY_CREATED', data: { lobbyCode: 'A3F9K2', hostId: 'p1a2b3c4' } })
+    ws.simulateMessage({
+      type: 'LOBBY_STATE',
+      data: { lobbyCode: 'A3F9K2', hostId: 'p2d5e6f7', gameMode: 'COOP', players: [] },
+    })
+
+    expect(store.isHost).toBe(false)
   })
 })
