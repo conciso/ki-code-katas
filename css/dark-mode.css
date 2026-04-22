@@ -1,0 +1,209 @@
+/* ── Dark Mode & Theme Overrides ── */
+
+/* ════════════════════════════════════════════
+   DARK MODE
+   ════════════════════════════════════════════ */
+[data-theme="dark"] {
+  /* Surfaces */
+  --bg-page:#333E48; --bg-surface:#3F4B56; --bg-overlay:rgba(0,190,190,.10); --bg-code:#060D0D;
+  /* Text */
+  --tx-brand:#C4D8D8; --tx-primary:#DDE9E9; --tx-secondary:#8AAFAF; --tx-muted:#7A9E9E;
+  /* Neutrals (only lowest, used as bg/border) */
+  --n-50:#0A1515; --n-100:#1C2E2E;
+  /* Borders */
+  --bd:1px solid #818C99; --bd-strong:1px solid #9DA8B6;
+  /* Focus – inner ring = bg-page color for "cutout" effect */
+  --focus-ring:0 0 0 3px #333E48,0 0 0 5px var(--co-500);
+  --focus-aa:0 0 0 2px #333E48,0 0 0 4px var(--co-500);
+  /* Elevation – heavier shadows on dark */
+  --e1:0 1px 2px rgba(0,0,0,.60),0 1px 3px 1px rgba(0,0,0,.40);
+  --e2:0 1px 2px rgba(0,0,0,.60),0 2px 6px 2px rgba(0,0,0,.40);
+  --e3:0 1px 3px rgba(0,0,0,.60),0 4px 8px 3px rgba(0,0,0,.40);
+  --e4:0 2px 3px rgba(0,0,0,.70),0 6px 10px 4px rgba(0,0,0,.40);
+  --e5:0 4px 4px rgba(0,0,0,.70),0 8px 12px 6px rgba(0,0,0,.40);
+  /* Semantic backgrounds – darkened */
+  --c-success-bg:#052415; --c-warning-bg:#231800; --c-error-bg:#220808;
+  /* Brand tints – very dark for dark surfaces */
+  --co-50:#071616; --ki-50:#111A04; --wo-50:#060F03; --es-50:#060A1A; --ro-50:#180308;
+  /* Badge text – lighter for dark backgrounds */
+  --badge-ok-text:#5CE8A0; --badge-warn-text:#F0C060; --badge-err-text:#F08080;
+  --badge-neu-bg:#445060; --badge-neu-text:#C4D8D8;
+  /* Contrast badge (dark) */
+  --cbadge-aa-bg:#052415; --cbadge-aa-text:#5CE8A0;
+  --cbadge-aaa-bg:#04141E; --cbadge-aaa-text:#70C8F0;
+  --cbadge-fail-bg:#220808; --cbadge-fail-text:#F08080;
+}
+/* Dark: Brand Wheel */
+[data-theme="dark"] .bw-outer { fill: #071616 }
+[data-theme="dark"] .bw-middle { fill: #0A2626 }
+[data-theme="dark"] .bw-divider { stroke: var(--bg-page) }
+[data-theme="dark"] .bw-ring-outline { stroke: var(--bg-page) }
+[data-theme="dark"] .bw-label-segment { fill: var(--co-200) }
+[data-theme="dark"] .bw-label-attr { fill: var(--co-300) }
+[data-theme="dark"] .bw-pillar-card { background: var(--bg-surface) }
+/* co-700 (#007575) on bg-surface (#3F4B56) = ~1.6:1 → co-300 (#4DD0D0) = ~4.8:1 ✓ AA */
+[data-theme="dark"] .bw-pillar-title { color: var(--co-300) }
+
+/* Dark: targeted component fixes that can't be token-driven */
+/* Select arrow: #4A6565 on #3F4B56 ≈ 1.1:1 → #8AAFAF (tx-secondary dark) ≈ 3.5:1 ✓ */
+[data-theme="dark"] .field select { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='%238AAFAF'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E") }
+[data-theme="dark"] .chip { border-color:#818C99 }
+[data-theme="dark"] .ai-warning { color:var(--ki-300) }
+[data-theme="dark"] .pal-note { background:var(--c-warning-bg);color:#f0d080;border-color:#806000 }
+[data-theme="dark"] .snack-ok { background:#052415; color:#b0f0d0 }
+[data-theme="dark"] .snack-err { background:#220808; color:#fde8e8 }
+[data-theme="dark"] .a11y-ok .a11y-rule-icon { background:#052415; color:#5CE8A0 }
+[data-theme="dark"] .a11y-fail .a11y-rule-icon { background:#220808; color:#F08080 }
+/* Dark: buttons – text/border auf dunklem Grund auf ≥4.5:1 heben (color-mix 40% brand + 60% white) */
+/* Filled: weißer Text auf brand-700-Fläche → bleibt unverändert (5–7:1 ✓) */
+[data-theme="dark"] .btn-tonal {
+  background: color-mix(in srgb, var(--c50) 25%, var(--bg-surface));
+  color: color-mix(in srgb, var(--c500) 40%, white);
+}
+[data-theme="dark"] .btn-elevated { color: color-mix(in srgb, var(--c500) 40%, white) }
+[data-theme="dark"] .btn-outlined {
+  color: color-mix(in srgb, var(--c500) 40%, white);
+  border-color: color-mix(in srgb, var(--c500) 40%, white);
+}
+[data-theme="dark"] .btn-outlined:hover { background: color-mix(in srgb, var(--c50) 15%, var(--bg-surface)) }
+[data-theme="dark"] .btn-text { color: color-mix(in srgb, var(--c500) 40%, white) }
+[data-theme="dark"] .btn-text:hover { background: color-mix(in srgb, var(--c50) 15%, var(--bg-surface)) }
+
+/* ════════════════════════════════════════════
+   DARK MODE: Beispielseiten
+   ════════════════════════════════════════════ */
+/* Shared structural overrides */
+[data-theme="dark"] .ep-logo { color: var(--tx-primary) !important }
+[data-theme="dark"] .ep-nav-links { color: var(--tx-secondary) !important }
+[data-theme="dark"] .ep-section { background: var(--bg-page) !important }
+[data-theme="dark"] .ep-section-h2 { color: var(--tx-primary) !important }
+[data-theme="dark"] .ep-section-sub { color: var(--tx-secondary) !important }
+[data-theme="dark"] .ep-card { background: var(--bg-surface) !important; box-shadow: var(--e2) }
+[data-theme="dark"] .ep-card-title { color: var(--tx-primary) !important }
+[data-theme="dark"] .ep-card-text { color: var(--tx-secondary) !important }
+[data-theme="dark"] .ep-card-icon { filter: brightness(.75) saturate(1.3) }
+[data-theme="dark"] .ep-stats { background: var(--bg-surface) !important }
+[data-theme="dark"] .ep-stat-label { color: var(--tx-secondary) !important }
+
+/* Landing: hero already dark – no change needed */
+
+/* Corporate: light teal → dark teal */
+[data-theme="dark"] #ep-co .ep-hero {
+  background: linear-gradient(140deg,#071616 0%,#0A2E2E 100%) !important;
+  color: #fff !important;
+}
+[data-theme="dark"] #ep-co .ep-hero .ep-hero-eyebrow { color: var(--co-300) !important }
+[data-theme="dark"] #ep-co .ep-hero .ep-hero-h1 { color: var(--tx-primary) !important }
+[data-theme="dark"] #ep-co .ep-hero .ep-hero-sub { color: var(--tx-secondary) !important }
+
+/* AI.Applied: light lime → dark lime (original dark style) */
+[data-theme="dark"] #ep-ai .ep-hero {
+  background: linear-gradient(140deg,#0A0F00 0%,#1C2800 100%) !important;
+  color: #fff !important;
+}
+[data-theme="dark"] #ep-ai .ep-hero .ep-hero-eyebrow { color: var(--ki-400) !important }
+[data-theme="dark"] #ep-ai .ep-hero .ep-hero-h1 { color: #F4FCD5 !important }
+[data-theme="dark"] #ep-ai .ep-hero .ep-hero-sub { color: var(--ki-300) !important }
+
+/* Effektive Software: light blue → dark blue */
+[data-theme="dark"] #ep-es .ep-hero {
+  background: linear-gradient(140deg,#071035 0%,#0D1A50 100%) !important;
+  color: #fff !important;
+}
+[data-theme="dark"] #ep-es .ep-hero .ep-hero-eyebrow { color: var(--es-300) !important }
+[data-theme="dark"] #ep-es .ep-hero .ep-hero-h1 { color: var(--tx-primary) !important }
+[data-theme="dark"] #ep-es .ep-hero .ep-hero-sub { color: var(--es-200) !important }
+
+/* Wirksame Organisationen: light green → dark green */
+[data-theme="dark"] #ep-wo .ep-hero {
+  background: linear-gradient(140deg,#0A1F05 0%,#152D0A 100%) !important;
+  color: #fff !important;
+}
+[data-theme="dark"] #ep-wo .ep-hero .ep-hero-eyebrow { color: var(--wo-300) !important }
+[data-theme="dark"] #ep-wo .ep-hero .ep-hero-h1 { color: var(--tx-primary) !important }
+[data-theme="dark"] #ep-wo .ep-hero .ep-hero-sub { color: var(--wo-200) !important }
+
+/* ── Bereichs-Komponenten Vergleich ── */
+/* Active tabs: --atab-color inline style is dark → override with light palette shades */
+[data-theme="dark"] .atab[data-area="co"].active { color: var(--co-200); border-bottom-color: var(--co-200) }
+[data-theme="dark"] .atab[data-area="ki"].active { color: var(--ki-200); border-bottom-color: var(--ki-200) }
+[data-theme="dark"] .atab[data-area="es"].active { color: var(--es-100); border-bottom-color: var(--es-100) }
+[data-theme="dark"] .atab[data-area="wo"].active { color: var(--wo-200); border-bottom-color: var(--wo-200) }
+/* Branded chips: override inline color/border that are hardcoded dark palette shades */
+[data-theme="dark"] #at-co .chip[style] { color: var(--co-200) !important; border-color: var(--co-300) !important }
+[data-theme="dark"] #at-ai .chip[style] { color: var(--ki-200) !important; border-color: var(--ki-400) !important }
+[data-theme="dark"] #at-es .chip[style] { color: var(--es-100) !important; border-color: var(--es-300) !important }
+[data-theme="dark"] #at-wo .chip[style] { color: var(--wo-200) !important; border-color: var(--wo-300) !important }
+
+/* ── Spacing & Grid + Code tokens ── */
+/* co-700 (#007575) on co-50 (#071616) = ~3:1 in dark → co-300 (#4DD0D0) = ~9.3:1 */
+[data-theme="dark"] .gcol  { color: var(--co-300) }
+[data-theme="dark"] .token { color: var(--co-300) }
+
+/* ── Cards ── */
+/* Area card icons/eyebrows – same shades used for area-specimen-text in dark mode (verified ≥4.5:1) */
+/* co-200 (#80DEDE) ~4.9:1 · ai-200 (#D6F06D) ~6.1:1 · es-100 (#C8D9F5) ~5.4:1 · wo-200 (#A3D48E) ~4.6:1 */
+[data-theme="dark"] .card[data-area="co"] .card-media{color:var(--co-200)}
+[data-theme="dark"] .card[data-area="ki"] .card-media{color:var(--ki-200)}
+[data-theme="dark"] .card[data-area="es"] .card-media{color:var(--es-100)}
+[data-theme="dark"] .card[data-area="wo"] .card-media{color:var(--wo-200)}
+[data-theme="dark"] .card[data-area="co"] .card-eyebrow{color:var(--co-200)}
+[data-theme="dark"] .card[data-area="ki"] .card-eyebrow{color:var(--ki-200)}
+[data-theme="dark"] .card[data-area="es"] .card-eyebrow{color:var(--es-100)}
+[data-theme="dark"] .card[data-area="wo"] .card-eyebrow{color:var(--wo-200)}
+/* Stat Card values: co-700 (#007575) ~1.6:1 on dark → lighter shades (verified ≥4.5:1) */
+[data-theme="dark"] .card-stat[data-area="co"] .card-stat-value{color:var(--co-200)}
+[data-theme="dark"] .card-stat[data-area="ki"] .card-stat-value{color:var(--ki-200)}
+[data-theme="dark"] .card-stat[data-area="es"] .card-stat-value{color:var(--es-100)}
+[data-theme="dark"] .card-stat[data-area="wo"] .card-stat-value{color:var(--wo-200)}
+
+/* ── Area specimen text – lighter palette shades pass ≥4.5:1 on dark surface (#3F4B56) ── */
+[data-theme="dark"] [data-area="co"] .area-specimen-text { color: var(--co-200) }   /* #80DEDE · 4.92:1 */
+[data-theme="dark"] [data-area="ki"] .area-specimen-text { color: var(--ki-200) }   /* #D6F06D · 6.10:1 */
+[data-theme="dark"] [data-area="es"] .area-specimen-text { color: var(--es-100) }   /* #C8D9F5 · 5.41:1 */
+[data-theme="dark"] [data-area="wo"] .area-specimen-text { color: var(--wo-200) }   /* #A3D48E · 4.57:1 */
+
+/* ── Download CTA (dark) ── */
+/* Icon colors: area-50 wird sehr dunkel → helle Palette-Shades wie area-specimen-text */
+[data-theme="dark"] .cta-dl[data-area="co"] .cta-dl-icon{color:var(--co-200)}
+[data-theme="dark"] .cta-dl[data-area="ki"] .cta-dl-icon{color:var(--ki-200)}
+[data-theme="dark"] .cta-dl[data-area="es"] .cta-dl-icon{color:var(--es-100)}
+[data-theme="dark"] .cta-dl[data-area="wo"] .cta-dl-icon{color:var(--wo-200)}
+[data-theme="dark"] .cta-dl[data-area="co"] .cta-dl-eyebrow{color:var(--co-200)}
+[data-theme="dark"] .cta-dl[data-area="ki"] .cta-dl-eyebrow{color:var(--ki-200)}
+[data-theme="dark"] .cta-dl[data-area="es"] .cta-dl-eyebrow{color:var(--es-100)}
+[data-theme="dark"] .cta-dl[data-area="wo"] .cta-dl-eyebrow{color:var(--wo-200)}
+[data-theme="dark"] .cta-strip[data-area="co"] .cta-strip-icon{color:var(--co-200)}
+[data-theme="dark"] .cta-strip[data-area="ki"] .cta-strip-icon{color:var(--ki-200)}
+[data-theme="dark"] .cta-strip[data-area="es"] .cta-strip-icon{color:var(--es-100)}
+[data-theme="dark"] .cta-strip[data-area="wo"] .cta-strip-icon{color:var(--wo-200)}
+[data-theme="dark"] .cta-visual[data-area="co"] .cta-visual-eyebrow{color:var(--co-200)}
+[data-theme="dark"] .cta-visual[data-area="ki"] .cta-visual-eyebrow{color:var(--ki-200)}
+[data-theme="dark"] .cta-visual[data-area="es"] .cta-visual-eyebrow{color:var(--es-100)}
+[data-theme="dark"] .cta-visual[data-area="wo"] .cta-visual-eyebrow{color:var(--wo-200)}
+[data-theme="dark"] .cta-link[data-area="co"]{color:var(--co-200)}
+[data-theme="dark"] .cta-link[data-area="ki"]{color:var(--ki-200)}
+[data-theme="dark"] .cta-link[data-area="es"]{color:var(--es-100)}
+[data-theme="dark"] .cta-link[data-area="wo"]{color:var(--wo-200)}
+
+/* ── Palette threshold badges (dark) ── */
+[data-theme="dark"] .pal-thresholds{background:#0d1f3a;color:#90bcf0;border-color:#1e3f6b}
+[data-theme="dark"] .thr-aa-l{background:#1a3355;color:#90bcf0}
+[data-theme="dark"] .thr-aa{background:#0a3028;color:#80e8c8}
+[data-theme="dark"] .thr-aaa{background:#2a1050;color:#c890ff}
+/* Code-Block (hell → dunkel) */
+[data-theme="dark"] .cb-wrap{border-color:var(--bd)}
+[data-theme="dark"] .cb-header{background:var(--bg-page);border-bottom-color:var(--bd)}
+[data-theme="dark"] .cb-lang{color:var(--co-200)}
+[data-theme="dark"] .cb-copy{border-color:var(--bd);color:var(--tx-muted)}
+[data-theme="dark"] .cb-copy:hover{background:var(--bg-overlay);color:var(--tx-primary)}
+[data-theme="dark"] .cb-body{background:var(--bg-surface);color:var(--tx-primary)}
+/* Syntax tokens auf bg-surface (#3F4B56) — alle ≥4.5:1 verifiziert */
+[data-theme="dark"] .cb-body .k{color:var(--es-200)}   /* #98B7EE · 5.1:1 */
+[data-theme="dark"] .cb-body .v{color:var(--co-200)}   /* #80DEDE · 4.9:1 */
+[data-theme="dark"] .cb-body .s{color:var(--wo-200)}   /* #A3D48E · 4.6:1 */
+[data-theme="dark"] .cb-body .c{color:var(--tx-muted)} /* gedimmt, ok für Kommentare */
+[data-theme="dark"] .cb-body .fn{color:var(--ro-200)}  /* #F0A0BE · 4.6:1 */
+[data-theme="dark"] .cb-numbered .cb-ln::before{color:var(--tx-muted)}
+/* Inline code – co-700 (#007575) ~1.6:1 auf co-50 dark → co-200 (#80DEDE) ~4.9:1 ✓ */
+[data-theme="dark"] .cb-prose code{color:var(--co-200);border-color:var(--n-100)}
